@@ -63,6 +63,10 @@ def is_prose(sentence: str, min_words: int = 8, max_words: int = 80) -> bool:
         return False
     if not sentence.endswith(_TERMINALS):
         return False
+    # Defence in depth: the cleaner strips bare URLs, but a scraped link that reaches a
+    # sentence is scaffolding, not prose, and must never be quoted as a bullet.
+    if "http://" in sentence or "https://" in sentence:
+        return False
     alpha = [w for w in words if w[0].isalpha()]
     if not alpha:
         return False

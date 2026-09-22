@@ -67,6 +67,18 @@ def test_is_prose_rejects_mid_word_truncated_stub() -> None:
     assert is_prose(TRUNCATED_STUB + ".")
 
 
+def test_is_prose_rejects_a_sentence_carrying_a_bare_url() -> None:
+    # "The Fly" pages glue the source link onto the lead sentence; the cleaner strips it,
+    # and this is the second layer that keeps one out of a bullet if it ever survives.
+    glued = (
+        "https://www.tipranks.com/news/the-fly/netflix Certain Apple TV users are being "
+        "prompted to link their Netflix accounts to the Apple TV app."
+    )
+    assert not is_prose(glued)
+    assert not is_prose(glued.replace("https://", "http://"))
+    assert is_prose(glued.split(" ", 1)[1])
+
+
 def test_is_prose_rejects_a_sentence_with_no_alphabetic_word() -> None:
     # Table rows survive the length and terminator checks but have no title case to measure.
     assert not is_prose("23.60 +0.42 1.81% 118 138 400 5 2025.")

@@ -84,12 +84,12 @@ choices rather than generic ones:
 | The date trap: bare `Month YYYY` mentions are dominated by "returned 275% since **May 2014**" (Insider Monkey boilerplate, 10 bodies) and "long **January 2026** $395 calls" (Motley Fool options-disclosure boilerplate, 9 bodies) | `infer_period()` counts only **full `Month D, YYYY` dates** (17 bodies carry one), never bare month-year mentions; a test asserts the real corpus yields "February 2025", not either boilerplate trap |
 | The ticker key is unreliable as a filter — a fleet-management market report sits under IBM, a Suze Orman piece under AAPL | Ticker is used as a retrieval **boost**, never a hard filter; ranking is primarily on text |
 
-The cleaner (`ingest/cleaner.py`) applies 17 named, order-sensitive regexes —
+The cleaner (`ingest/cleaner.py`) applies 18 named, order-sensitive regexes —
 `whitespace`, `mt_newswires_paywall`, `zacks_footer`, `zacks_free_report`,
 `simply_wall_st_footer`, `insider_monkey_footer`, `syndication_footer`,
 `view_comments_tail`, `motley_fool_promo`, `motley_fool_disclosure`,
 `insider_monkey_pitch`, `read_also`, `yahoo_related_videos`,
-`yahoo_quote_widget`, `relative_timestamp`, `story_continues`,
+`yahoo_quote_widget`, `relative_timestamp`, `story_continues`, `bare_url`,
 `whitespace_final` — plus a title-echo strip, each named so a test can target
 exactly one rule. Anything under 400 cleaned characters is flagged
 `is_truncated`; 24 of the 138 raw records land under that line.
@@ -287,7 +287,7 @@ Coverage (`examples/coverage.txt`, regenerated with
 `pytest --cov=newschat --cov-report=term-missing`):
 
 ```
-TOTAL                                   1014      7    99%
+TOTAL                                   1016      7    99%
 ```
 
 Tests that exercise the live Claude CLI are marked `@pytest.mark.llm` and are

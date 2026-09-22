@@ -93,6 +93,10 @@ RULES: tuple[Rule, ...] = (
     _rule("yahoo_quote_widget", r"\s*Real Time Price • USD \([A-Z.]+\).{0,300}?Advanced Chart"),
     _rule("relative_timestamp", r"\s*\b" + _AGO + r"\b"),
     _rule("story_continues", r"\s*\bStory Continues\b"),
+    # "The Fly" pages glue a bare source URL onto the front of the lead sentence, which
+    # then gets cited as if it were prose. The corpus carries no markdown or anchor text,
+    # so a URL in a body is never part of a sentence worth quoting.
+    _rule("bare_url", r"\s*https?://\S+"),
     _rule("whitespace_final", r"\s+"),
 )
 

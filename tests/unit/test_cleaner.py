@@ -134,6 +134,27 @@ def test_yahoo_quote_widget_block_removed() -> None:
     assert apply_rule(body, rule) == "Shares slipped.  Analysts remain divided."
 
 
+def test_bare_url_removed() -> None:
+    rule = rule_named("bare_url")
+    body = (
+        "https://www.tipranks.com/news/the-fly/sunnova-energy Certain Apple TV (AAPL) 4K "
+        "users are being prompted to link their accounts. See http://example.com/x?a=1&b=2 "
+        "for more."
+    )
+    # In isolation the rule leaves its replacement space behind; `whitespace_final`
+    # collapses it, so `clean()` gives the finished sentence.
+    assert apply_rule(body, rule).strip() == (
+        "Certain Apple TV (AAPL) 4K users are being prompted to link their accounts. See  for more."
+    )
+    assert clean(body).text == (
+        "Certain Apple TV (AAPL) 4K users are being prompted to link their accounts. See for more."
+    )
+    # A bare domain is not a link and must survive: it is ordinary prose.
+    assert (
+        apply_rule("Zacks.com is a property of Zacks.", rule) == "Zacks.com is a property of Zacks."
+    )
+
+
 def test_motley_fool_promo_matches_curly_apostrophe() -> None:
     rule = rule_named("motley_fool_promo")
     for apostrophe in ("'", "’"):
