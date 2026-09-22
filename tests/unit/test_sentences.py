@@ -34,6 +34,13 @@ def test_closing_quotes_stay_with_sentence() -> None:
     ]
 
 
+def test_closing_paren_stays_with_sentence() -> None:
+    assert split_sentences("Sales rose (see table.) Next quarter looks strong.") == [
+        "Sales rose (see table.)",
+        "Next quarter looks strong.",
+    ]
+
+
 def test_empty_and_whitespace() -> None:
     assert split_sentences("") == []
     assert split_sentences("   \n ") == []
