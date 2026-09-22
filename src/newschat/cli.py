@@ -63,7 +63,7 @@ def _ask(question: str, backend: str | None, data: Path | None) -> int:
 
 
 def _eval(golden: Path, data: Path | None) -> int:
-    from newschat.evaluation import format_report, run_evaluation  # type: ignore[import-untyped]
+    from newschat.evaluation import format_report, run_evaluation
 
     report = run_evaluation(golden, Corpus.load(data))
     print(format_report(report))

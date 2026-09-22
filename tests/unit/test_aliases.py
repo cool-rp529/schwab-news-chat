@@ -18,6 +18,7 @@ from newschat.retrieval.aliases import ALIASES, alias_tokens, find_tickers, ment
         ("IBM", ["IBM"]),
         ("the ibm deal", ["IBM"]),
         ("weather in Tokyo", []),
+        ("Foxconn's factories in India", ["AAPL"]),
     ],
 )
 def test_find_tickers(text: str, expected: list[str]) -> None:

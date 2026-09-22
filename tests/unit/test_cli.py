@@ -53,3 +53,10 @@ def test_serve_calls_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_no_command_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([]) == 2
     assert "usage:" in capsys.readouterr().out
+
+
+def test_eval_prints_report(capsys: pytest.CaptureFixture[str], data_path: Path) -> None:
+    golden = Path(__file__).resolve().parents[1] / "eval" / "golden.yaml"
+    code = main(["eval", "--golden", str(golden), "--data", str(data_path)])
+    out = capsys.readouterr().out
+    assert code == 0 and "seeded" in out and "recall@5" in out

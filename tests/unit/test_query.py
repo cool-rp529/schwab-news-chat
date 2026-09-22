@@ -35,6 +35,15 @@ def test_best_is_a_stopword() -> None:
     assert "best" in QUERY_STOPWORDS
 
 
+def test_giant_bare_e_and_team_are_stopwords() -> None:
+    # "giant" ("tech giant", "streaming giant") and "team"/"teaming" (generic organizational
+    # nouns, as in "marketing team" or "teaming up") are generic business descriptors like the
+    # existing "company"/"market" entries. "e" is a tokenizer split artifact of "e-commerce"
+    # style hyphenated terms. All three diluted a paraphrase-tier golden case's ranking with
+    # spurious matches on unrelated articles.
+    assert {"giant", "e", "team"} <= QUERY_STOPWORDS
+
+
 def test_follow_up_inherits_tickers_and_keywords() -> None:
     history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
     q = QueryAnalyzer().resolve("Who wants to buy it?", history)

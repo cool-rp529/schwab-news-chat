@@ -6,7 +6,16 @@ import re
 from newschat.text.tokenize import tokenize
 
 ALIASES: dict[str, tuple[str, ...]] = {
-    "AAPL": ("apple", "iphone", "ipad", "macbook", "apple tv", "tim cook", "cupertino"),
+    "AAPL": (
+        "apple",
+        "iphone",
+        "ipad",
+        "macbook",
+        "apple tv",
+        "tim cook",
+        "cupertino",
+        "foxconn",
+    ),
     "AMZN": ("amazon", "aws", "amazon web services", "andy jassy", "prime video", "whole foods"),
     "IBM": ("ibm", "international business machines", "watsonx", "arvind krishna", "red hat"),
     "INTC": ("intel", "intel foundry", "pat gelsinger", "lip-bu tan"),

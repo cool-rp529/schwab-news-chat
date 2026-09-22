@@ -1,0 +1,221 @@
+# Three tiers. Seeded: asserted thresholds. Paraphrase: headline-disjoint wording — each
+# question shares no non-alias, non-stopword content word with the target article's TITLE
+# (body overlap is fine; full body-disjointness is impossible for an on-topic question) — the
+# tier that can disconfirm the no-embeddings bet; reported, held to a lower bar. Thematic:
+# comparative/aggregate questions; ticker coverage reported unasserted because k=5
+# structurally caps recall.
+k: 5
+cases:
+  # ---------------- seeded ----------------
+  - id: intel-overview
+    tier: seeded
+    question: "What's going on with Intel?"
+    expected_tickers: [INTC]
+    expected_articles: ["Intel Shares Jump After Report", "Intel stock surges on report of Broadcom", "Broadcom, TSMC consider possible deals with Intel", "Intel could get split up"]
+    expected_kinds: [event]
+  - id: intel-buyers
+    tier: seeded
+    question: "Who might buy parts of Intel?"
+    expected_tickers: [INTC]
+    expected_articles: ["Broadcom, TSMC consider possible deals with Intel", "Intel stock surges 10% because TSMC and Broadcom", "Intel stock surges on report of Broadcom"]
+    expected_kinds: [event]
+  - id: intel-price-targets
+    tier: seeded
+    question: "How did analysts change their price targets on Intel?"
+    expected_tickers: [INTC]
+    expected_articles: ["Evercore ISI Adjusts Price Target on Intel", "Cantor Fitzgerald Adjusts Price Target on Intel", "Citic Securities Downgrades Intel"]
+    expected_kinds: [opinion]
+  - id: intel-fade
+    tier: seeded
+    question: "Which analyst says to fade the Intel rally?"
+    expected_tickers: [INTC]
+    expected_articles: ["Fade the rally in Intel stock"]
+  - id: nvidia-earnings
+    tier: seeded
+    question: "What do analysts expect from Nvidia's earnings?"
+    expected_tickers: [NVDA]
+    expected_articles: ["Nvidia Set to Beat Earnings", "Nvidia Set to Beat Q4 Earnings"]
+    expected_kinds: [opinion]
+  - id: nvidia-dbs
+    tier: seeded
+    question: "What did DBS Bank do to Nvidia's price target?"
+    expected_tickers: [NVDA]
+    expected_articles: ["DBS Bank Adjusts NVIDIA Price Target"]
+    expected_kinds: [opinion]
+  - id: nvidia-cramer
+    tier: seeded
+    question: "What does Jim Cramer think about Nvidia?"
+    expected_tickers: [NVDA]
+    expected_articles: ["Jim Cramer on NVIDIA Corporation (NVDA)", "Jim Cramer on NVIDIA (NVDA)"]
+    expected_kinds: [opinion]
+  - id: nvidia-stake
+    tier: seeded
+    question: "Did Nvidia sell a stake in a rival?"
+    expected_tickers: [NVDA]
+    expected_articles: ["Nvidia slashes stake in emerging rival"]
+  - id: apple-launch
+    tier: seeded
+    question: "What is Apple launching this week?"
+    expected_tickers: [AAPL]
+    expected_articles: ["Apple Could Announce a New iPhone Tomorrow", "Apple's Launch of iPhone SE4", "Apple Inc. (AAPL) Teases New Product Launch"]
+  - id: apple-alibaba
+    tier: seeded
+    question: "Who is Apple partnering with for AI in China?"
+    expected_tickers: [AAPL]
+    expected_articles: ["Apple Partners With Alibaba"]
+    expected_kinds: [event]
+  - id: apple-foxconn
+    tier: seeded
+    question: "What happened with Foxconn making iPhones in India?"
+    expected_tickers: [AAPL]
+    expected_articles: ["Foxconn's Efforts To Make iPhones In India"]
+  - id: amazon-inspire
+    tier: seeded
+    question: "Why is Amazon shutting down Inspire?"
+    expected_tickers: [AMZN]
+    expected_articles: ["Amazon Shuts Down Inspire Shopping Feed"]
+    expected_kinds: [event]
+  - id: amazon-union
+    tier: seeded
+    question: "Did Amazon workers in North Carolina vote to unionize?"
+    expected_tickers: [AMZN]
+    expected_articles: ["North Carolina Amazon Employees Vote Against"]
+  - id: aws-health
+    tier: seeded
+    question: "What is AWS doing in healthcare?"
+    expected_tickers: [AMZN]
+    expected_articles: ["AWS expands AI in healthcare"]
+  - id: msft-q4
+    tier: seeded
+    question: "Why did Microsoft stock return 13% in Q4?"
+    expected_tickers: [MSFT]
+    expected_articles: ["Why Microsoft (MSFT) Stock Returned 13% in Q4"]
+  - id: openai-benchmark
+    tier: seeded
+    question: "What benchmark did OpenAI introduce?"
+    expected_tickers: [MSFT]
+    expected_articles: ["OpenAI Introduces SWE-Lancer Benchmark"]
+  - id: netflix-apple-tv
+    tier: seeded
+    question: "Is Netflix going to support the Apple TV app?"
+    expected_tickers: [AAPL, NFLX]
+    expected_articles: ["Netflix to finally support Apple TV app"]
+  - id: netflix-live-sports
+    tier: seeded
+    question: "Why will Netflix and Amazon dominate live sports?"
+    expected_tickers: [AMZN, NFLX]
+    expected_articles: ["Why Netflix and Amazon will dominate live sports"]
+  - id: ibm-penn-state
+    tier: seeded
+    question: "What is IBM doing with Penn State?"
+    expected_tickers: [IBM]
+    expected_articles: ["Penn State Taps IBM"]
+    expected_kinds: [event]
+  - id: ibm-cramer
+    tier: seeded
+    question: "What did Jim Cramer say about IBM?"
+    expected_tickers: [IBM]
+    expected_articles: ["Jim Cramer Says International Business Machines"]
+    expected_kinds: [opinion]
+  - id: buffett
+    tier: seeded
+    question: "What has Warren Buffett been buying?"
+    expected_tickers: []
+    expected_articles: ["Why Warren Buffett keeps buying Occidental", "Constellation Brands Levels as Stock Soars on News of Berkshire", "Warren Buffett Winner Soars"]
+  - id: bofa-bullish
+    tier: seeded
+    question: "Why are BofA strategists bullish?"
+    expected_tickers: []
+    expected_articles: ["Wall Street bullish as cash levels drop"]
+  # ---------------- negatives (seeded tier, expect refusal) ----------------
+  - id: neg-boeing
+    tier: seeded
+    question: "What are Boeing's 737 MAX safety issues?"
+    expect_covered: false
+  - id: neg-tesla
+    tier: seeded
+    question: "What's the latest on Tesla's Cybertruck recall?"
+    expect_covered: false
+  - id: neg-weather
+    tier: seeded
+    question: "What is the weather in Tokyo tomorrow?"
+    expect_covered: false
+  - id: neg-bitcoin
+    tier: seeded
+    question: "What is the price of Bitcoin today?"
+    expect_covered: false
+  - id: neg-superbowl
+    tier: seeded
+    question: "Who won the Super Bowl?"
+    expect_covered: false
+  - id: neg-sourdough
+    tier: seeded
+    question: "How do I bake sourdough bread?"
+    expect_covered: false
+  # ---------------- paraphrase (headline-disjoint wording) ----------------
+  - id: para-intel-carved
+    tier: paraphrase
+    question: "Is Intel getting carved up?"
+    expected_tickers: [INTC]
+    expected_articles: ["Intel could get split up", "Intel Shares Jump After Report on Potential Deals to Split"]
+  - id: para-apple-ecommerce
+    tier: paraphrase
+    question: "Is Apple teaming up with a Chinese e-commerce giant?"
+    expected_tickers: [AAPL]
+    expected_articles: ["Apple Partners With Alibaba"]
+  - id: para-nvidia-trim
+    tier: paraphrase
+    question: "Did Nvidia trim one of its holdings?"
+    expected_tickers: [NVDA]
+    expected_articles: ["Nvidia slashes stake in emerging rival"]
+  # rewritten: controller ruling — "feature" collided with the target's own title word.
+  - id: para-amazon-feature
+    tier: paraphrase
+    question: "Is Amazon killing off a discovery experience for shoppers?"
+    expected_tickers: [AMZN]
+    expected_articles: ["Amazon Shuts Down Inspire Shopping Feed"]
+  # rewritten: controller ruling — "sports" collided with the target's own title word;
+  # no alias present, so no ticker is expected.
+  - id: para-streaming-sports
+    tier: paraphrase
+    question: "Will the streaming giants own televised athletics?"
+    expected_tickers: []
+    expected_articles: ["Why Netflix and Amazon will dominate live sports"]
+  # rewritten: controller ruling — "university" collided with the target's own title word.
+  - id: para-ibm-university
+    tier: paraphrase
+    question: "Is a university deploying IBM for campus help?"
+    expected_tickers: [IBM]
+    expected_articles: ["Penn State Taps IBM"]
+  - id: para-amazon-organizing
+    tier: paraphrase
+    question: "Are Amazon warehouse staff organizing?"
+    expected_tickers: [AMZN]
+    expected_articles: ["North Carolina Amazon Employees Vote Against"]
+  # rewritten: controller ruling — "Wall Street" collided with the target's own title words.
+  - id: para-wall-street-mood
+    tier: paraphrase
+    question: "Are investors feeling optimistic right now?"
+    expected_tickers: []
+    expected_articles: ["Wall Street bullish as cash levels drop"]
+  # ---------------- thematic (coverage reported, unasserted) ----------------
+  - id: theme-deepseek
+    tier: thematic
+    question: "Which companies are exposed to DeepSeek?"
+    expected_ticker_coverage: [AAPL, MSFT, AMZN, NVDA, IBM]
+  - id: theme-intel-vs-nvidia
+    tier: thematic
+    question: "Compare Intel's and Nvidia's situations"
+    expected_ticker_coverage: [INTC, NVDA]
+  - id: theme-most-profitable
+    tier: thematic
+    question: "Which companies are called the most profitable tech stock?"
+    expected_ticker_coverage: [AAPL, MSFT, NFLX]
+  - id: theme-ai-race
+    tier: thematic
+    question: "Summarize the AI race across the big tech companies"
+    expected_ticker_coverage: [MSFT, AMZN, NVDA, IBM]
+  - id: theme-market-mood
+    tier: thematic
+    question: "What's the overall market mood?"
+    expected_ticker_coverage: [AAPL, MSFT, AMZN, NVDA]
