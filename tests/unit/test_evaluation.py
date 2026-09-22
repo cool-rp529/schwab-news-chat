@@ -77,3 +77,37 @@ def test_metrics_on_synthetic_cases(corpus: Corpus, tmp_path: Path) -> None:
     assert seeded.refusal_rate == pytest.approx(1.0)
     assert any("miss" in f for f in seeded.failures)
     assert report.passed is False
+
+
+def test_unmeasured_metrics_render_as_dash(corpus: Corpus, tmp_path: Path) -> None:
+    golden = {
+        "k": 5,
+        "cases": [
+            {
+                "id": "theme-only",
+                "tier": "thematic",
+                "question": "Which companies are exposed to DeepSeek?",
+                "expected_ticker_coverage": ["AAPL", "MSFT"],
+            },
+        ],
+    }
+    p = tmp_path / "g.yaml"
+    p.write_text(yaml.safe_dump(golden), encoding="utf-8")
+    report = run_evaluation(p, corpus)
+    thematic = report.tiers["thematic"]
+    assert thematic.recall_at_k is None
+    assert thematic.mrr is None
+    assert thematic.ticker_accuracy is None
+    assert thematic.kind_accuracy is None
+    assert thematic.refusal_rate is None
+    assert thematic.ticker_coverage is not None
+
+    text = format_report(report)
+    rows = [line for line in text.splitlines() if line.startswith("thematic")]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.count("-") >= 5  # recall, mrr, tickers, kinds, refused all render as "-"
+    assert "0." in row  # the coverage column is a real number
+
+    # No seeded tier at all -> passed must be False, not vacuously True.
+    assert report.passed is False

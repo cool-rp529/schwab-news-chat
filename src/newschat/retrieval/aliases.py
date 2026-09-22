@@ -14,6 +14,8 @@ ALIASES: dict[str, tuple[str, ...]] = {
         "apple tv",
         "tim cook",
         "cupertino",
+        # Apple's primary contract manufacturer; the corpus files its India-assembly
+        # article under AAPL even though the ticker key alone never mentions Apple.
         "foxconn",
     ),
     "AMZN": ("amazon", "aws", "amazon web services", "andy jassy", "prime video", "whole foods"),

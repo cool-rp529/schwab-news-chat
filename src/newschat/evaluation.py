@@ -57,11 +57,11 @@ class CaseResult:
 class TierReport:
     tier: str
     n: int
-    recall_at_k: float
-    mrr: float
-    ticker_accuracy: float
-    kind_accuracy: float
-    refusal_rate: float
+    recall_at_k: float | None
+    mrr: float | None
+    ticker_accuracy: float | None
+    kind_accuracy: float | None
+    refusal_rate: float | None
     ticker_coverage: float | None
     failures: list[str]
 
@@ -134,8 +134,8 @@ def run_case(
     return CaseResult(case, titles, recall, rr, ticker_ok, kinds_ok, None, coverage)
 
 
-def _mean(values: Sequence[float]) -> float:
-    return sum(values) / len(values) if values else 1.0
+def _mean(values: Sequence[float]) -> float | None:
+    return sum(values) / len(values) if values else None
 
 
 def _tier_report(tier: str, results: Sequence[CaseResult]) -> TierReport:
@@ -163,7 +163,7 @@ def _tier_report(tier: str, results: Sequence[CaseResult]) -> TierReport:
         ticker_accuracy=_mean(tickers),
         kind_accuracy=_mean(kinds),
         refusal_rate=_mean(refusals),
-        ticker_coverage=_mean(coverages) if coverages else None,
+        ticker_coverage=_mean(coverages),
         failures=failures,
     )
 
@@ -178,13 +178,18 @@ def evaluate(cases: Sequence[GoldenCase], corpus: Corpus, k: int = 5) -> EvalRep
     tiers = {tier: _tier_report(tier, results) for tier, results in by_tier.items()}
     seeded = tiers.get(ASSERTED_TIER)
     passed = seeded is not None and all(
-        getattr(seeded, metric) >= floor for metric, floor in THRESHOLDS.items()
+        (value := getattr(seeded, metric)) is not None and value >= floor
+        for metric, floor in THRESHOLDS.items()
     )
     return EvalReport(tiers=tiers, thresholds=dict(THRESHOLDS), passed=passed, k=k)
 
 
 def run_evaluation(golden_path: Path, corpus: Corpus) -> EvalReport:
     return evaluate(load_golden(golden_path), corpus, k=_golden_k(golden_path))
+
+
+def _fmt(value: float | None) -> str:
+    return f"{value:.2f}" if value is not None else "-"
 
 
 def format_report(report: EvalReport) -> str:
@@ -195,10 +200,10 @@ def format_report(report: EvalReport) -> str:
     )
     lines = [header, "-" * len(header)]
     for tier, t in report.tiers.items():
-        cov = f"{t.ticker_coverage:.2f}" if t.ticker_coverage is not None else "-"
         lines.append(
-            f"{tier:<11}{t.n:>4}{t.recall_at_k:>11.2f}{t.mrr:>8.2f}{t.ticker_accuracy:>9.2f}"
-            f"{t.kind_accuracy:>8.2f}{t.refusal_rate:>9.2f}{cov:>10}"
+            f"{tier:<11}{t.n:>4}{_fmt(t.recall_at_k):>11}{_fmt(t.mrr):>8}"
+            f"{_fmt(t.ticker_accuracy):>9}{_fmt(t.kind_accuracy):>8}"
+            f"{_fmt(t.refusal_rate):>9}{_fmt(t.ticker_coverage):>10}"
         )
     th = report.thresholds
     lines.append(

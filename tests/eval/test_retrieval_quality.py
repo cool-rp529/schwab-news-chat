@@ -19,25 +19,30 @@ def report(corpus: Corpus) -> EvalReport:
 
 
 def test_seeded_recall(report: EvalReport) -> None:
-    assert report.tiers["seeded"].recall_at_k >= THRESHOLDS["recall_at_k"], report.tiers[
-        "seeded"
-    ].failures
+    seeded = report.tiers["seeded"]
+    assert seeded.recall_at_k is not None and seeded.recall_at_k >= THRESHOLDS["recall_at_k"], (
+        seeded.failures
+    )
 
 
 def test_seeded_mrr(report: EvalReport) -> None:
-    assert report.tiers["seeded"].mrr >= THRESHOLDS["mrr"], report.tiers["seeded"].failures
+    seeded = report.tiers["seeded"]
+    assert seeded.mrr is not None and seeded.mrr >= THRESHOLDS["mrr"], seeded.failures
 
 
 def test_seeded_ticker_accuracy(report: EvalReport) -> None:
-    assert report.tiers["seeded"].ticker_accuracy >= THRESHOLDS["ticker_accuracy"], report.tiers[
-        "seeded"
-    ].failures
+    seeded = report.tiers["seeded"]
+    assert (
+        seeded.ticker_accuracy is not None
+        and seeded.ticker_accuracy >= THRESHOLDS["ticker_accuracy"]
+    ), seeded.failures
 
 
 def test_seeded_kind_accuracy(report: EvalReport) -> None:
-    assert report.tiers["seeded"].kind_accuracy >= THRESHOLDS["kind_accuracy"], report.tiers[
-        "seeded"
-    ].failures
+    seeded = report.tiers["seeded"]
+    assert (
+        seeded.kind_accuracy is not None and seeded.kind_accuracy >= THRESHOLDS["kind_accuracy"]
+    ), seeded.failures
 
 
 def test_negatives_all_refused(report: EvalReport) -> None:
@@ -47,9 +52,8 @@ def test_negatives_all_refused(report: EvalReport) -> None:
 def test_paraphrase_tier_is_reported(report: EvalReport) -> None:
     para = report.tiers["paraphrase"]
     assert para.n >= 8
-    assert para.recall_at_k >= 0.5, (
-        para.failures
-    )  # deliberately lower bar; the gap is the cost of no embeddings
+    # deliberately lower bar; the gap is the cost of no embeddings
+    assert para.recall_at_k is not None and para.recall_at_k >= 0.5, para.failures
 
 
 def test_thematic_tier_is_reported_not_asserted(report: EvalReport) -> None:
