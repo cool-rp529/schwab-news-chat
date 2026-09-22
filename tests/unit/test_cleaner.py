@@ -15,7 +15,7 @@ CONTINUE = "Intel stock rose Tuesday. Continue Reading View Comments"
 INSIDER = (
     "DeepSeek has failed to respond. Why are we interested in the stocks that hedge funds pile "
     "into? The reason is simple: our research has shown that we can outperform the market by "
-    "imitating the top stock picks of the best hedge funds. Our quarterly newsletter’s strategy "  # noqa: RUF001
+    "imitating the top stock picks of the best hedge funds. Our quarterly newsletter’s strategy "
     "selects 14 small-cap and large-cap stocks every quarter and has returned 275% since May "
     "2014, beating its benchmark by 150 percentage points (see more details here). Story "
     "Continues Apple is a technology company."
