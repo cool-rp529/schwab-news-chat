@@ -76,9 +76,11 @@ class Retriever:
 
     @property
     def specific_terms(self) -> frozenset[str]:
-        """Terms in at most 10 % of articles (11 of 118): words that name a topic of their own,
-        unlike "buy" or "deal", which half the corpus uses."""
-        return self.index.terms_with_df_at_most(math.floor(SPECIFIC_DF_SHARE * self.index.n_docs))
+        """Terms in at most 10 % of articles (12 of 118, rounded up): words that name a topic of
+        their own, unlike "buy" or "deal", which half the corpus uses."""
+        # ceil, not floor: floor would put the corpus's own headline topic on the boundary
+        # ("deepseek" is in 11 articles), so one more article would stop it counting.
+        return self.index.terms_with_df_at_most(math.ceil(SPECIFIC_DF_SHARE * self.index.n_docs))
 
     def search(self, q: ResolvedQuery, k: int | None = None) -> list[Hit]:
         k = k or self.config.k

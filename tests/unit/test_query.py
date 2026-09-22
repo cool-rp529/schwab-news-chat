@@ -264,3 +264,10 @@ def test_without_specific_terms_only_a_keywordless_reference_is_unresolved() -> 
     analyzer = QueryAnalyzer()
     assert analyzer.resolve("What about it?", []).unresolved_reference is True
     assert analyzer.resolve("Who might buy it?", []).unresolved_reference is False
+
+
+def test_modal_verbs_are_not_specific_topics_even_when_rare() -> None:
+    analyzer = QueryAnalyzer(specific_terms=SPECIFIC | {"might", "may"})
+    assert analyzer.resolve("Who might buy it?", []).unresolved_reference is True
+    assert analyzer.resolve("Who may buy it?", []).unresolved_reference is True
+    assert "might" not in QUERY_STOPWORDS

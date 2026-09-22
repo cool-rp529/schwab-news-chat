@@ -46,6 +46,11 @@ _QUERY_STOPWORDS_RAW = """
     """
 QUERY_STOPWORDS: frozenset[str] = frozenset(stem(w) for w in _QUERY_STOPWORDS_RAW.split())
 
+# Modal verbs never name a topic, but "might" is rare enough (12 of 118 articles) to pass the
+# specificity cutoff. Ignored only in that check, not as query stopwords: BM25 still needs them
+# for headline-lexical questions ("Who might buy parts of Intel?").
+_NON_TOPIC_WORDS = frozenset({"might", "may", "must", "shall"})
+
 _ANAPHORA_RE = re.compile(
     r"\b(?:it|its|they|them|their|that|this|those|these|he|she|his|her"
     r"|the company|the stock|the deal|the firm|the shares)\b",
@@ -150,7 +155,7 @@ class QueryAnalyzer:
         """Whether a keyword is rare enough in the corpus to be a topic on its own."""
         if self.specific_terms is None:
             return bool(keywords)
-        return any(k in self.specific_terms for k in keywords)
+        return any(k in self.specific_terms and k not in _NON_TOPIC_WORDS for k in keywords)
 
     @staticmethod
     def _last_with_tickers(history: Sequence[ChatTurn]) -> ResolvedQuery | None:
