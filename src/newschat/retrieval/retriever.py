@@ -6,7 +6,6 @@ absolute gate runs first: raw BM25 >= `min_absolute_score` and idf-weighted keyw
 `min_coverage`, unless the article ticker-matches the query.
 """
 
-import re
 from dataclasses import dataclass
 
 from newschat.ingest.corpus import Corpus
@@ -15,12 +14,6 @@ from newschat.retrieval.aliases import mentions
 from newschat.retrieval.bm25 import BM25Index
 from newschat.text.sentences import is_prose, split_sentences
 from newschat.text.tokenize import tokenize
-
-# Scraped Yahoo articles carry a relative-age stamp ("3 hours ago") next to carousel/related
-# links. `is_prose` (T4) filters short label lines but a longer prose sentence can still end
-# up quoting one ("...bullish thirty days ago..."), so the retriever excludes any sentence
-# mentioning "ago" from passage selection rather than risk citing a stamp as a fact.
-_RELATIVE_TIME_RE = re.compile(r"\bago\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -57,8 +50,7 @@ class Retriever:
         self.config = config or RetrieverConfig()
         self.index = BM25Index([tokenize(a.title) * 2 + tokenize(a.text) for a in corpus.articles])
         self._sentences = [
-            [s for s in split_sentences(a.text) if is_prose(s) and not _RELATIVE_TIME_RE.search(s)]
-            for a in corpus.articles
+            [s for s in split_sentences(a.text) if is_prose(s)] for a in corpus.articles
         ]
 
     def search(self, q: ResolvedQuery, k: int | None = None) -> list[Hit]:

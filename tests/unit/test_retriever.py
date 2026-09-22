@@ -1,9 +1,12 @@
+import re
+
 import pytest
 
 from newschat.ingest.corpus import Corpus
 from newschat.models import Article, ResolvedQuery
 from newschat.retrieval.query import QueryAnalyzer
 from newschat.retrieval.retriever import Retriever, RetrieverConfig
+from newschat.text.sentences import is_prose, split_sentences
 
 
 def art(i: int, text: str, tickers: list[str], truncated: bool = False, title: str = "") -> Article:
@@ -164,8 +167,15 @@ def test_real_gate_passes_in_corpus_questions(
     ]
 
 
+STAMP_RE = re.compile(r"\b\d+\s+(?:minutes?|hours?|days?)\s+ago\b|\b\d{1,2}:\d{2}\b|•")
+
+
 def test_real_passages_never_contain_carousel_or_stamps(real: Retriever) -> None:
     for question in ["Wall Street bullish cash levels", "Buffett Occidental", "Meta stock streak"]:
         for hit in real.search(q(question)):
             for p in hit.passages:
-                assert "•" not in p and " ago" not in p, p
+                assert not STAMP_RE.search(p), p
+    # Legitimate prose that merely contains "ago" must remain eligible as a passage.
+    assert any(
+        " ago" in s for a in real.corpus.articles for s in split_sentences(a.text) if is_prose(s)
+    )
