@@ -49,5 +49,5 @@ def test_infer_period_unknown_without_dates() -> None:
 
 
 def test_real_corpus_period_is_february_2025(data_path: Path) -> None:
-    # Guards the May-2014 / January-2026 boilerplate trap documented in CLAUDE.md.
+    # Guards the May-2014 / January-2026 boilerplate trap in the README's data-findings table.
     assert Corpus.load(data_path).infer_period() == "February 2025"

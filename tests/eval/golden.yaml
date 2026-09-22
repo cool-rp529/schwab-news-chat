@@ -2,8 +2,9 @@
 # question shares no non-alias, non-stopword content word with the target article's TITLE
 # (body overlap is fine; full body-disjointness is impossible for an on-topic question) — the
 # tier that can disconfirm the no-embeddings bet; reported, held to a lower bar. Thematic:
-# comparative/aggregate questions; ticker coverage reported unasserted because k=5
-# structurally caps recall.
+# comparative/aggregate questions; ticker coverage reported unasserted because two of the
+# five are refused outright by the absolute gate, which is a property worth measuring rather
+# than a threshold worth passing.
 k: 5
 cases:
   # ---------------- seeded ----------------
@@ -168,20 +169,22 @@ cases:
     question: "Did Nvidia trim one of its holdings?"
     expected_tickers: [NVDA]
     expected_articles: ["Nvidia slashes stake in emerging rival"]
-  # rewritten: controller ruling — "feature" collided with the target's own title word.
+  # rewritten: "app"/"inside" collided with the target headline, violating the tier's
+  # disjointness rule.
   - id: para-amazon-feature
     tier: paraphrase
     question: "Is Amazon killing off a discovery experience for shoppers?"
     expected_tickers: [AMZN]
     expected_articles: ["Amazon Shuts Down Inspire Shopping Feed"]
-  # rewritten: controller ruling — "sports" collided with the target's own title word;
-  # no alias present, so no ticker is expected.
+  # rewritten: "sport" collided with the target headline, violating the tier's disjointness
+  # rule; the replacement carries no alias, so no ticker is expected.
   - id: para-streaming-sports
     tier: paraphrase
     question: "Will the streaming giants own televised athletics?"
     expected_tickers: []
     expected_articles: ["Why Netflix and Amazon will dominate live sports"]
-  # rewritten: controller ruling — "university" collided with the target's own title word.
+  # rewritten: "student" collided with the target headline, violating the tier's
+  # disjointness rule.
   - id: para-ibm-university
     tier: paraphrase
     question: "Is a university deploying IBM for campus help?"
@@ -192,7 +195,8 @@ cases:
     question: "Are Amazon warehouse staff organizing?"
     expected_tickers: [AMZN]
     expected_articles: ["North Carolina Amazon Employees Vote Against"]
-  # rewritten: controller ruling — "Wall Street" collided with the target's own title words.
+  # rewritten: "wall"/"street" collided with the target headline, violating the tier's
+  # disjointness rule.
   - id: para-wall-street-mood
     tier: paraphrase
     question: "Are investors feeling optimistic right now?"

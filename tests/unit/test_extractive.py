@@ -36,8 +36,7 @@ DISTINCT = [
     "Intel won a multiyear supply agreement with a major automotive manufacturer in Germany.",
     "Intel disclosed a cybersecurity vulnerability affecting several generations of server chips.",
     "Intel opened a research laboratory focused on photonic interconnects in Oregon last month.",
-    "Intel settled a patent dispute with a rival over memory controller designs for a cash "
-    "payment.",
+    "Intel settled a patent dispute with a rival over memory interface designs for a cash payment.",
 ]
 
 
@@ -107,10 +106,13 @@ def test_empty_groups_are_omitted() -> None:
     assert KIND_HEADINGS["opinion"] not in text and KIND_HEADINGS["promo"] not in text
 
 
-def test_lead_names_returned_tickers_not_requested() -> None:
-    hits = [hit(0, [S_EVENT], tickers=["INTC", "MSFT"])]
+def test_lead_names_tickers_of_cited_hits() -> None:
+    # Hit 2 supplies no passage, so it is never cited — and its ticker must not appear in
+    # the lead line either, which has to agree with the Sources list underneath it.
+    hits = [hit(0, [S_EVENT], tickers=["INTC", "MSFT"]), hit(1, [], 0.8, tickers=["NVDA"])]
     text = ExtractiveSummarizer(INFO).summarize(Q, hits, []).text
     assert "From 1 article on INTC, MSFT:" in text
+    assert "NVDA" not in text and "[2] Title 1" not in text
 
 
 def test_near_duplicates_are_suppressed() -> None:

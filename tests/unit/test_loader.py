@@ -41,6 +41,16 @@ def test_top_level_must_be_dict(tmp_path: Path) -> None:
         load_records(write(tmp_path, [GOOD]))
 
 
+def test_ticker_value_must_be_a_list(tmp_path: Path) -> None:
+    with pytest.raises(CorpusError, match=r"AAPL.*expected a list"):
+        load_records(write(tmp_path, {"AAPL": GOOD}))
+
+
+def test_list_item_must_be_an_object(tmp_path: Path) -> None:
+    with pytest.raises(CorpusError, match=r"IBM\[1\].*expected an object"):
+        load_records(write(tmp_path, {"IBM": [GOOD, "not an article"]}))
+
+
 def test_missing_field_reports_location(tmp_path: Path) -> None:
     bad = {k: v for k, v in GOOD.items() if k != "full_text"}
     with pytest.raises(CorpusError, match=r"AAPL\[1\].*full_text"):

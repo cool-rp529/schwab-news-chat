@@ -31,7 +31,7 @@ def test_from_corpus_defaults_to_extractive(service: ChatService) -> None:
 
 
 def test_ask_returns_grounded_answer(service: ChatService) -> None:
-    ans = service.ask("s1", "What's going on with Intel?")
+    ans = service.ask(SessionStore.new_id(), "What's going on with Intel?")
     assert ans.covered and ans.citations and ans.text.endswith(ADVISORY)
     assert ans.query.tickers == ["INTC"]
 
@@ -46,15 +46,15 @@ def test_follow_up_uses_session_history(service: ChatService) -> None:
 
 
 def test_separate_sessions_do_not_share_history(service: ChatService) -> None:
-    service.ask("x", "What's going on with Intel?")
-    ans = service.ask("y", "Who wants to buy it?")
+    service.ask(SessionStore.new_id(), "What's going on with Intel?")
+    ans = service.ask(SessionStore.new_id(), "Who wants to buy it?")
     assert ans.query.inherited_tickers is False
 
 
 @pytest.mark.parametrize("question", ["", "   ", "x" * (MAX_QUESTION_CHARS + 1)])
 def test_rejects_blank_and_overlong(service: ChatService, question: str) -> None:
     with pytest.raises(ValueError):
-        service.ask("s", question)
+        service.ask(SessionStore.new_id(), question)
 
 
 def test_fallback_when_primary_unavailable(corpus: Corpus) -> None:
@@ -68,16 +68,16 @@ def test_fallback_when_primary_unavailable(corpus: Corpus) -> None:
         info,
     )
     assert svc.backend == "broken"
-    ans = svc.ask("s", "What's going on with Intel?")
+    ans = svc.ask(SessionStore.new_id(), "What's going on with Intel?")
     assert ans.backend == "extractive (fallback: kaput)" and ans.covered
 
 
 def test_not_covered_question_gets_refusal(service: ChatService) -> None:
-    ans = service.ask("s", "What is the price of Bitcoin today?")
+    ans = service.ask(SessionStore.new_id(), "What is the price of Bitcoin today?")
     assert ans.covered is False and ans.citations == [] and "doesn't cover that" in ans.text
 
 
 def test_advice_question_still_carries_advisory(service: ChatService) -> None:
-    ans = service.ask("s", "Should I buy Nvidia stock?")
+    ans = service.ask(SessionStore.new_id(), "Should I buy Nvidia stock?")
     assert ans.text.endswith(ADVISORY)
     assert ans.advisory == ADVISORY
