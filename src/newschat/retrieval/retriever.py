@@ -2,8 +2,15 @@
 
 Scoring: BM25 over (title x2 + body) -> x ticker boost -> x truncation penalty.
 Refusal: relative filtering alone can never refuse (the top hit is 1.0 by construction), so an
-absolute gate runs first: raw BM25 >= `min_absolute_score` and idf-weighted keyword coverage >=
-`min_coverage`, unless the article ticker-matches the query.
+absolute gate runs first: idf-normalised match strength >= `min_strength` and idf-weighted keyword
+coverage >= `min_coverage`, unless the article ticker-matches the query.
+
+Strength is `raw / total_idf`, not raw BM25. Raw BM25 sums over query terms, so a fixed raw floor
+measures how many rare words a question happens to contain rather than how well the corpus answers
+it: a one-term query is bounded by about `idf * (k1 + 1)` and can never clear a floor calibrated on
+three-term queries. Dividing by the query's total idf yields the idf-weighted mean term saturation,
+bounded by `k1 + 1` for every query length, so the same floor means the same thing whether the
+question is "DeepSeek" or "How is DeepSeek affecting AI stocks?".
 """
 
 from dataclasses import dataclass
@@ -22,14 +29,15 @@ class RetrieverConfig:
     ticker_boost: float = 1.5
     truncated_penalty: float = 0.5
     context_weight: float = 0.5
-    # measured 2026-09-22 by scripts/measure_gate.py: negatives' best row maxed at
-    # raw=7.35 cov=0.31 ("Who won the Super Bowl?") once blocked on coverage, and at
-    # raw=5.76 cov=0.59 ("best pizza in Chicago", after stemming "best" out as a query
-    # stopword) once blocked on raw instead; positives' worst row was
-    # raw=6.77 cov=0.55 ("How is DeepSeek affecting AI stocks?"). 6.2/0.45 clears every
-    # negative on at least one axis with margin >= 0.10, and clears every positive on
-    # both axes with margin >= 0.10.
-    min_absolute_score: float = 6.2
+    # measured 2026-09-22 by scripts/measure_gate.py. Negatives' best row peaked at
+    # strength=0.77 cov=0.59 ("best pizza in Chicago", after stemming "best" out as a query
+    # stopword); every other negative sat at strength <= 0.64. Positives' worst row was
+    # strength=1.20 cov=0.55 ("How is DeepSeek affecting AI stocks?"), and the bare-topic
+    # queries ("DeepSeek", "Tell me about DeepSeek") sit at strength=2.17 cov=1.00 -- those
+    # are the cases a raw floor silently refused, because one term cannot sum past ~5.1.
+    # 1.0/0.45 clears every negative on at least one axis and every positive on both, with
+    # margin >= 0.20 on strength.
+    min_strength: float = 1.0
     min_coverage: float = 0.45
     min_relative_score: float = 0.2
     passages_per_hit: int = 3
@@ -86,7 +94,8 @@ class Retriever:
                 coverage = (
                     sum(self.index.idf(t) for t in matched_own) / total_idf if total_idf else 0.0
                 )
-                if raw < self.config.min_absolute_score or coverage < self.config.min_coverage:
+                strength = raw / total_idf if total_idf else 0.0
+                if strength < self.config.min_strength or coverage < self.config.min_coverage:
                     continue
             score = raw
             score *= self.config.ticker_boost if ticker_match else 1.0

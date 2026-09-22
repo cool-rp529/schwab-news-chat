@@ -1,7 +1,7 @@
-...................s.................................................... [ 27%]
-........................................................................ [ 54%]
-........................................................................ [ 82%]
-...............................................                          [100%]
+....................s................................................... [ 25%]
+........................................................................ [ 51%]
+........................................................................ [ 77%]
+.............................................................            [100%]
 =============================== tests coverage ================================
 ______________ coverage: platform win32, python 3.12.10-final-0 _______________
 
@@ -12,7 +12,7 @@ src\newschat\__main__.py                   2      2     0%   1-3
 src\newschat\api\__init__.py               0      0   100%
 src\newschat\api\app.py                   48      2    96%   74-75
 src\newschat\chat\__init__.py              0      0   100%
-src\newschat\chat\service.py              45      0   100%
+src\newschat\chat\service.py              47      0   100%
 src\newschat\chat\session.py              24      0   100%
 src\newschat\cli.py                       62      0   100%
 src\newschat\evaluation.py               142      0   100%
@@ -24,17 +24,18 @@ src\newschat\ingest\loader.py             37      0   100%
 src\newschat\models.py                    48      0   100%
 src\newschat\retrieval\__init__.py         0      0   100%
 src\newschat\retrieval\aliases.py         18      0   100%
-src\newschat\retrieval\bm25.py            33      0   100%
-src\newschat\retrieval\query.py           33      0   100%
-src\newschat\retrieval\retriever.py       88      1    99%   75
+src\newschat\retrieval\bm25.py            35      0   100%
+src\newschat\retrieval\query.py           43      1    98%   70
+src\newschat\retrieval\retriever.py       92      1    99%   88
 src\newschat\summarize\__init__.py         0      0   100%
-src\newschat\summarize\base.py            73      0   100%
+src\newschat\summarize\base.py            78      0   100%
 src\newschat\summarize\claims.py          23      0   100%
-src\newschat\summarize\claude_cli.py      85      2    98%   120-121
-src\newschat\summarize\extractive.py     101      0   100%
+src\newschat\summarize\claude_cli.py      86      2    98%   122-123
+src\newschat\summarize\extractive.py     105      0   100%
 src\newschat\summarize\factory.py         16      0   100%
 src\newschat\text\__init__.py              0      0   100%
 src\newschat\text\sentences.py            28      0   100%
 src\newschat\text\tokenize.py             20      0   100%
 --------------------------------------------------------------------
-TOTAL                                   1016      7    99%
+TOTAL                                   1044      8    99%
+276 passed, 1 skipped in 13.11s

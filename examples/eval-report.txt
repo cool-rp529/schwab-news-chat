@@ -1,6 +1,6 @@
 tier          n   recall@5     mrr  tickers   kinds  refused  false_ref  coverage
 ---------------------------------------------------------------------------------
-seeded       28       0.87    0.88     1.00    0.80     1.00       0.00         -
+seeded       29       0.88    0.88     1.00    0.80     1.00       0.00         -
 paraphrase    8       0.56    0.43     1.00       -        -       0.25         -
 thematic      5          -       -        -       -        -       0.40      0.60
 threshold             0.80    0.70     0.90    0.80     1.00          -         -   (asserted on seeded)

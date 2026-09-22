@@ -122,6 +122,20 @@ def strip_invalid_citations(text: str, n_hits: int) -> str:
     return CITATION_RE.sub(lambda m: m.group(0) if 1 <= int(m.group(1)) <= n_hits else "", text)
 
 
+def renumber_densely(text: str) -> tuple[str, list[int]]:
+    """Rewrite citation markers so they run 1..M with no gaps.
+
+    Excerpt numbers are an internal prompt detail: the model is free to cite 1 and 3 and skip
+    2, and a reader seeing Sources jump [1] [3] reasonably concludes a source went missing.
+    Returns the rewritten text and the original numbers in their new order, so a rendered [i]
+    still resolves to ``hits[original[i - 1] - 1]``.
+    """
+    original = sorted(set(cited_numbers(text)))
+    mapping = {n: i for i, n in enumerate(original, start=1)}
+    rewritten = CITATION_RE.sub(lambda m: f"[{mapping[int(m.group(1))]}]", text)
+    return rewritten, original
+
+
 def check_faithfulness(claim: str, passages: Sequence[str], threshold: float = 0.5) -> bool:
     """Lexical stand-in for entailment: share of the claim's content tokens found in the
     cited excerpt. Catches a fabricated claim, not a subtly distorted one."""

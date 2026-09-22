@@ -11,6 +11,13 @@ machine as part of the prompt sent to Anthropic via the CLI. Everything else
 in this project — including the fourth transcript below and the entire test
 suite — runs fully offline.
 
+One caveat on these captures: the second transcript ("Who might buy parts of
+Intel?") numbers its sources [1] [3] [4] [5]. That gap is the bug fixed after
+these were recorded — citation numbers are now renumbered densely on both
+backends, so a rerun would print [1] [2] [3] [4]. The captures are left as
+recorded rather than edited by hand; the extractive transcript at the bottom
+is reproducible today and does show the current behaviour.
+
 ## What's going on with Intel?
 
 ```

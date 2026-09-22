@@ -160,10 +160,21 @@ makes the best-scoring article 1.0 by construction, so a relative floor alone
 can never refuse — measured against this corpus, a purely relative filter
 returned five confidently cited hits for "What is the weather in Paris
 tomorrow?" and "Who won the 2022 FIFA World Cup?". Instead, a non-ticker-
-matched article must clear `min_absolute_score = 6.2` **and** an idf-weighted
+matched article must clear `min_strength = 1.0` **and** an idf-weighted
 keyword coverage of `min_coverage = 0.45` (Σidf(matched keywords) /
 Σidf(all keywords) — terms the corpus never mentions carry maximum idf and
 sink a query below the floor) *before* any normalisation happens.
+
+Strength is `raw BM25 / Σidf(query keywords)`, not raw BM25. Raw BM25 sums
+over query terms, so a fixed raw floor measures how many rare words a
+question happens to contain rather than how well the corpus answers it: a
+one-term query is bounded by about `idf × (k1 + 1)`, so "Tell me about
+DeepSeek" — a topic covered by 11 articles, at perfect keyword coverage —
+scored 5.08 and was refused by a floor calibrated on three-term queries.
+Dividing by total idf yields the idf-weighted mean term saturation, bounded
+by `k1 + 1` for every query length, so one floor means the same thing
+whether the question is "DeepSeek" or "How is DeepSeek affecting AI
+stocks?".
 Ticker-matched articles bypass the gate but still need at least one matching
 keyword. Both constants were measured against the real corpus and its
 negatives by `scripts/measure_gate.py` (see
@@ -355,9 +366,11 @@ request.
 ## Repository notes
 
 `scripts/measure_gate.py` is the script that measured the frozen refusal-gate
-constants (`min_absolute_score = 6.2`, `min_coverage = 0.45`) against the
+constants (`min_strength = 1.0`, `min_coverage = 0.45`) against the
 real corpus and its negative questions — it's how those numbers were chosen,
-not guessed. `examples/` holds evidence regenerated from the working tree
+not guessed. The measurement that fixed them: every negative's best row
+peaked at strength 0.77, every positive's worst at 1.20, and the bare-topic
+queries sit at 2.17. `examples/` holds evidence regenerated from the working tree
 (the eval table, the full `pytest --cov` output, and CLI/extractive sample
 transcripts) so a reviewer can read the project's own claims about itself
 without having to run anything.

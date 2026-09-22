@@ -67,7 +67,9 @@ def q(text: str) -> ResolvedQuery:
 
 @pytest.fixture
 def mini() -> Retriever:
-    return Retriever(MINI, RetrieverConfig(min_absolute_score=0.5, min_coverage=0.5))
+    # 0.4, not 0.5: the one-term rows in MINI land exactly on 0.50/0.50, so a 0.5 floor
+    # decides them on float rounding. These tests are about ordering, not the gate.
+    return Retriever(MINI, RetrieverConfig(min_strength=0.4, min_coverage=0.4))
 
 
 def test_ticker_boost_orders_matching_article_first(mini: Retriever) -> None:
@@ -165,6 +167,32 @@ def test_real_gate_passes_in_corpus_questions(
     assert any(title_fragment.lower() in h.article.title.lower() for h in hits[:3]), [
         h.article.title for h in hits
     ]
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Tell me about DeepSeek",
+        "DeepSeek",
+        "What is DeepSeek?",
+        # Not included: "Which companies are exposed to DeepSeek?". Its rare word
+        # "exposed" never appears in the corpus, so it fails on coverage (0.35) and
+        # strength (0.76) alike, and no floor admits it without also admitting the
+        # "best pizza in Chicago" negative at 0.77. It lives in the thematic tier of
+        # golden.yaml, where the false refusal is reported rather than asserted away.
+    ],
+)
+def test_short_query_on_a_covered_topic_is_not_refused(real: Retriever, question: str) -> None:
+    """A topic in 11 articles must not refuse merely because the query is short.
+
+    BM25 sums over query terms, so a one-term query's raw score is bounded by about
+    idf * (k1 + 1) -- under any floor calibrated on three-term queries. DeepSeek is the
+    case that exposes it: no ticker alias, so the ticker_match bypass cannot rescue it
+    the way it silently rescues "intel" (raw 4.07) and "nvidia" (raw 3.39).
+    """
+    hits = real.search(q(question))
+    assert hits, question
+    assert any("deepseek" in h.article.text.lower() for h in hits), [h.article.title for h in hits]
 
 
 STAMP_RE = re.compile(r"\b\d+\s+(?:minutes?|hours?|days?)\s+ago\b|\b\d{1,2}:\d{2}\b|•")

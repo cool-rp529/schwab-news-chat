@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -120,7 +121,21 @@ def test_near_duplicates_are_suppressed() -> None:
     ans = ExtractiveSummarizer(INFO).summarize(Q, hits, [])
     bullets = [line for line in ans.text.splitlines() if line.startswith("- ")]
     assert len(bullets) == 2
-    assert {c.n for c in ans.citations} == {1, 3}
+    # Identity, not numbering: the duplicate article is the one that must be absent.
+    # Numbering is renumbered densely, so asserting {1, 3} here would re-encode a gap.
+    assert {c.article_id for c in ans.citations} == {"a0", "a2"}
+
+
+def test_citation_numbers_are_dense_when_a_hit_contributes_no_sentence() -> None:
+    """A retrieved-but-uncited hit must not leave a hole in the numbering.
+
+    Hit 2 is a near-duplicate of hit 1, so MMR drops it. If citations keep their hit rank,
+    the reader sees Sources jump [1] [3] and reasonably concludes a source is missing.
+    """
+    hits = [hit(0, [S_EVENT]), hit(1, [S_EVENT_DUP], 0.9), hit(2, [S_OPINION], 0.8)]
+    ans = ExtractiveSummarizer(INFO).summarize(Q, hits, [])
+    assert [c.n for c in ans.citations] == [1, 2]
+    assert sorted({int(m) for m in re.findall(r"\[(\d+)\]", ans.text)}) == [1, 2]
 
 
 def test_promo_is_down_ranked_below_event_with_equal_overlap() -> None:

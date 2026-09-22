@@ -35,6 +35,13 @@ HITS = [
 ]
 
 
+HITS3 = [
+    hit(0, "Intel may be split up by rivals Broadcom and TSMC after a Wall Street Journal report."),
+    hit(1, "An unrelated sentence about quarterly guidance that the model chooses not to cite."),
+    hit(2, "Broadcom is interested in Intel's chip design unit, while TSMC eyes the factories."),
+]
+
+
 def ok_payload(result: str, **extra: Any) -> str:
     payload: dict[str, Any] = {
         "type": "result",
@@ -168,3 +175,20 @@ def test_claims_with_markers_reattaches_leading_citations() -> None:
         "Intel may be split. [1]",
         "Broadcom is interested. [2]",
     ]
+
+
+def test_llm_citations_are_renumbered_densely() -> None:
+    """The model may cite excerpts 1 and 3 and skip 2; the reader must not see a gap.
+
+    Excerpt numbers are an internal prompt detail. Once the answer is rendered, [1] [3]
+    reads as a missing source, and the extractive path already renumbers densely -- the
+    two backends must not disagree about what a citation number means.
+    """
+    result = "Broadcom may bid for the design unit [1]. TSMC is looking at the factories [3]."
+    summarizer = ClaudeCliSummarizer(INFO, runner=runner_returning(ok_payload(result)))
+    ans = summarizer.summarize(Q, HITS3, [])
+    assert [c.n for c in ans.citations] == [1, 2]
+    # [2] must now point at the article that was excerpt 3.
+    assert ans.citations[1].article_id == "a2"
+    assert "[3]" not in ans.text
+    assert "[1]" in ans.text and "[2]" in ans.text

@@ -23,6 +23,7 @@ from newschat.summarize.base import (
     envelope,
     make_citations,
     not_covered_answer,
+    renumber_densely,
     strip_invalid_citations,
 )
 from newschat.summarize.claims import is_advice
@@ -80,9 +81,10 @@ class ClaudeCliSummarizer:
             raise SummarizerUnavailable("advice-shaped output rejected")
         if not cited_numbers(text):
             raise SummarizerUnavailable("output carried no citations")
+        text, order = renumber_densely(text)
         return envelope(
             body=text,
-            citations=self._citations(text, hits),
+            citations=self._citations(text, hits, order),
             backend=self.name,
             query=query,
             covered=True,
@@ -145,15 +147,17 @@ class ClaudeCliSummarizer:
             raise SummarizerUnavailable("CLI returned an empty result")
         return result
 
-    def _citations(self, text: str, hits: Sequence[Hit]) -> list[Citation]:
+    def _citations(self, text: str, hits: Sequence[Hit], order: Sequence[int]) -> list[Citation]:
         sentences = _claims_with_markers(text)
         all_citations = make_citations(hits)
         out: list[Citation] = []
-        for n in sorted(set(cited_numbers(text))):
-            claims = [s for s in sentences if f"[{n}]" in s]
+        for dense, source in enumerate(order, start=1):
+            claims = [s for s in sentences if f"[{dense}]" in s]
             verified = bool(claims) and all(
-                check_faithfulness(c, hits[n - 1].passages, self.config.faithfulness_threshold)
+                check_faithfulness(c, hits[source - 1].passages, self.config.faithfulness_threshold)
                 for c in claims
             )
-            out.append(all_citations[n - 1].model_copy(update={"verified": verified}))
+            out.append(
+                all_citations[source - 1].model_copy(update={"n": dense, "verified": verified})
+            )
         return out

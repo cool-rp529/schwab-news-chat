@@ -47,6 +47,16 @@ def jaccard(a: set[str] | frozenset[str], b: set[str] | frozenset[str]) -> float
     return len(a & b) / len(a | b)
 
 
+def dense_numbering(cited: Sequence[int]) -> dict[int, int]:
+    """Map hit ranks to contiguous citation numbers.
+
+    A hit can be retrieved and still contribute no sentence -- MMR drops a near-duplicate, or
+    max_sentences runs out before its turn. Keeping its rank renders Sources as [1] [2] [4],
+    which reads as a source that went missing rather than one that was never cited.
+    """
+    return {n: i for i, n in enumerate(cited, start=1)}
+
+
 class ExtractiveSummarizer:
     name = "extractive"
 
@@ -117,6 +127,7 @@ class ExtractiveSummarizer:
 
     def _render(self, hits: Sequence[Hit], selected: Sequence[_Candidate]) -> str:
         cited = sorted({c.n for c in selected})
+        dense = dense_numbering(cited)
         tickers = sorted({t for n in cited for t in hits[n - 1].article.tickers})
         noun = "article" if len(cited) == 1 else "articles"
         lines = [f"From {len(cited)} {noun} on {', '.join(tickers)}:", ""]
@@ -125,12 +136,12 @@ class ExtractiveSummarizer:
             if not group:
                 continue
             lines.append(KIND_HEADINGS[kind])
-            lines.extend(f"- {c.sentence} [{c.n}]" for c in group)
+            lines.extend(f"- {c.sentence} [{dense[c.n]}]" for c in group)
             lines.append("")
         lines.append("Sources")
         for n in cited:
             article = hits[n - 1].article
-            lines.append(f"[{n}] {article.title} ({', '.join(article.tickers)})")
+            lines.append(f"[{dense[n]}] {article.title} ({', '.join(article.tickers)})")
         return "\n".join(lines)
 
     def _citations(self, hits: Sequence[Hit], selected: Sequence[_Candidate]) -> list[Citation]:
@@ -138,7 +149,10 @@ class ExtractiveSummarizer:
         for c in sorted(selected, key=lambda c: c.order):
             first_per_hit.setdefault(c.n, c)
         all_citations = make_citations(hits)
+        dense = dense_numbering(sorted(first_per_hit))
         return [
-            all_citations[n - 1].model_copy(update={"passage": c.sentence, "kind": c.kind})
+            all_citations[n - 1].model_copy(
+                update={"n": dense[n], "passage": c.sentence, "kind": c.kind}
+            )
             for n, c in sorted(first_per_hit.items())
         ]

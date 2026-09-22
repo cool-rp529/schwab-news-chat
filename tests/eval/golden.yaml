@@ -153,6 +153,15 @@ cases:
     tier: seeded
     question: "How do I bake sourdough bread?"
     expect_covered: false
+  - id: deepseek-bare-topic
+    tier: seeded
+    # Regression guard: a bare topic name is one keyword, and a raw-BM25 floor refuses it
+    # however well the corpus covers it (11 articles here) because one term cannot sum past
+    # about idf*(k1+1). Expected set chosen by an independent rule -- the three articles that
+    # mention DeepSeek most (10, 5, 5 mentions); every other mention count is 3 or fewer.
+    question: "Tell me about DeepSeek"
+    expected_tickers: []
+    expected_articles: ["Apple Inc. (AAPL) Teases New Product Launch", "Jim Cramer on Amazon.com (AMZN)", "Jim Cramer Says International Business Machines"]
   # ---------------- paraphrase (headline-disjoint wording) ----------------
   - id: para-intel-carved
     tier: paraphrase
