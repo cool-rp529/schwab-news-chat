@@ -1,9 +1,9 @@
-tier          n   recall@5     mrr  tickers   kinds  refused  coverage
-----------------------------------------------------------------------
-seeded       28       0.87    0.88     1.00    0.80     1.00         -
-paraphrase    8       0.56    0.43     1.00       -        -         -
-thematic      5          -       -        -       -        -      0.60
-threshold             0.80    0.70     0.90    0.80     1.00         -   (asserted on seeded)
+tier          n   recall@5     mrr  tickers   kinds  refused  false_ref  coverage
+---------------------------------------------------------------------------------
+seeded       28       0.87    0.88     1.00    0.80     1.00       0.00         -
+paraphrase    8       0.56    0.43     1.00       -        -       0.25         -
+thematic      5          -       -        -       -        -       0.40      0.60
+threshold             0.80    0.70     0.90    0.80     1.00          -         -   (asserted on seeded)
 passed: True
   [seeded] intel-overview: recall 0.50; got ['Where Will Intel Stock Be In 1 Year?', 'Intel stock surges on report of Broadcom, TSMC exploring deals that would split up chipmaker', 'Why Intel could be worth more than $200 billion if it breaks up']
   [seeded] intel-buyers: recall 0.33; got ['Intel stock surges 10% because TSMC and Broadcom both might buy a piece of it', "AMD's Secret Weapon Against Intel? Analysts Say It's Worth $170!", "Intel could get split up by its rivals. Here's what to know"]
@@ -14,4 +14,8 @@ passed: True
   [paraphrase] para-intel-carved: recall 0.50; got ['Where Will Intel Stock Be In 1 Year?', 'Intel stock surges on report of Broadcom, TSMC exploring deals that would split up chipmaker', 'Why Intel could be worth more than $200 billion if it breaks up']
   [paraphrase] para-amazon-feature: recall 0.00; got ['AWS expands AI in healthcare through a Memorial Sloan Kettering partnership', "Meta's Llama AI Model Sees Rapid Adoption and Global Expansion", 'North Carolina Amazon Employees Vote Against\xa0Unionizing']
   [paraphrase] para-streaming-sports: recall 0.00; got []
+  [paraphrase] para-streaming-sports: refused a covered question
   [paraphrase] para-wall-street-mood: recall 0.00; got []
+  [paraphrase] para-wall-street-mood: refused a covered question
+  [thematic] theme-deepseek: refused a covered question
+  [thematic] theme-market-mood: refused a covered question

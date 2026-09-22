@@ -1,8 +1,9 @@
 # News Chat
 
 A chat application that answers natural-language questions about recent
-financial news drawn from `data/stock_news.json` — a fixed, ~140-article
-corpus covering seven tickers (AAPL, MSFT, AMZN, NFLX, NVDA, INTC, IBM) from
+financial news drawn from `data/stock_news.json` — a fixed corpus of 138
+records, 118 unique articles once deduplicated by link, covering seven
+tickers (AAPL, MSFT, AMZN, NFLX, NVDA, INTC, IBM) from
 around February 2025. Every answer is built from sentences reproduced
 verbatim from cited articles, opens with the corpus's inferred time period,
 closes with a not-investment-advice line, and refuses outright when the
@@ -78,7 +79,7 @@ choices rather than generic ones:
 |---|---|
 | 138 records but only 118 unique `link`s — 13 articles filed under 2–4 tickers | Dedupe by URL; union the ticker lists onto one `Article` |
 | 4 of those 13 duplicate groups have **divergent bodies** (drifting relative timestamps, a Yahoo video-carousel sidebar) despite identical titles | "First occurrence" is a dict-ordering coin flip; dedupe keeps the **longest** body instead, deterministically |
-| 13 MT Newswires paywall stubs, 11 "Continue Reading View Comments" stubs | Stripped by rule; flagged `is_truncated`; down-ranked at retrieval time rather than excluded, so a truncated article can still surface when nothing else matches |
+| 13 MT Newswires paywall stubs, 11 "Continue Reading View Comments" stubs | Stripped by rule; flagged `is_truncated`; down-ranked at retrieval time rather than excluded, so a truncated article can still surface when nothing else matches. The stubs are cut **mid-word** (~100 chars), so `is_prose()` also requires a terminal stop — otherwise a bullet reads "…a benchmark of more than 1,400 free [1]" |
 | Insider Monkey listicle boilerplate, Motley Fool promo and options-disclosure paragraphs, Zacks footers, an embedded Yahoo video carousel | Stripped so none of it can be selected as a cited passage — an unrelated carousel headline being cited as "news" would be worse than not having it |
 | The date trap: bare `Month YYYY` mentions are dominated by "returned 275% since **May 2014**" (Insider Monkey boilerplate, 10 bodies) and "long **January 2026** $395 calls" (Motley Fool options-disclosure boilerplate, 9 bodies) | `infer_period()` counts only **full `Month D, YYYY` dates** (17 bodies carry one), never bare month-year mentions; a test asserts the real corpus yields "February 2025", not either boilerplate trap |
 | The ticker key is unreliable as a filter — a fleet-management market report sits under IBM, a Suze Orman piece under AAPL | Ticker is used as a retrieval **boost**, never a hard filter; ranking is primarily on text |
@@ -174,7 +175,7 @@ empty groups omitted). Fully deterministic, no network or API key required.
 
 **The envelope.** The not-investment-advice line, the `as_of` corpus-period
 stamp, the inherited-follow-up note, and the citation faithfulness check
-(`check_faithfulness` — token/n-gram overlap between a cited claim and its
+(`check_faithfulness` — token-set overlap between a cited claim and its
 source passage) all live in `summarize/base.py`, not in any one backend: a
 control written only into an LLM prompt does not exist on the extractive
 path, which is the path a keyless reviewer actually runs, so these apply to
@@ -218,7 +219,7 @@ rules can do on prose this varied, not a tuned number.
 [![CI](https://github.com/cool-rp529/schwab-news-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/cool-rp529/schwab-news-chat/actions/workflows/ci.yml)
 
 ```bash
-uv run pytest -q                                    # full suite, offline, ~13s
+uv run pytest -q                                    # full suite, offline, ~9s
 uv run pytest -m llm                                # LLM-path tests (see below)
 uv run pytest --cov=newschat --cov-report=term-missing
 uv run ruff check . && uv run mypy src
@@ -240,35 +241,53 @@ negatives, with `expected_articles`/`expected_tickers`/`expected_kinds`;
 thresholds asserted here), **paraphrase** (questions sharing no non-alias
 content word with the target headline, probing what BM25's title boost
 can't help with; reported at a lower bar, not asserted as strictly), and
-**thematic** (comparative/aggregate questions where `k=5` structurally caps
-recall — one has 11 relevant articles across 6 tickers; reported
-**unasserted**, on purpose, rather than gamed into passing).
+**thematic** (comparative/aggregate questions — one has 11 relevant articles
+across 6 tickers; reported **unasserted**, on purpose, rather than gamed
+into passing).
 
 ```
-tier          n   recall@5     mrr  tickers   kinds  refused  coverage
-----------------------------------------------------------------------
-seeded       28       0.87    0.88     1.00    0.80     1.00         -
-paraphrase    8       0.56    0.43     1.00       -        -         -
-thematic      5          -       -        -       -        -      0.60
-threshold             0.80    0.70     0.90    0.80     1.00         -   (asserted on seeded)
+tier          n   recall@5     mrr  tickers   kinds  refused  false_ref  coverage
+---------------------------------------------------------------------------------
+seeded       28       0.87    0.88     1.00    0.80     1.00       0.00         -
+paraphrase    8       0.56    0.43     1.00       -        -       0.25         -
+thematic      5          -       -        -       -        -       0.40      0.60
+threshold             0.80    0.70     0.90    0.80     1.00          -         -   (asserted on seeded)
 passed: True
 ```
 
+`refused` is the share of *negatives* the gate refused; `false_ref` is the
+share of *positives* it refused, reported and deliberately not asserted.
+Together they are the two halves of the same trade, and the second half is
+where the last two tiers' numbers actually come from.
+
+The thematic tier's 0.60 is not a `k=5` ceiling: measured per case,
+`theme-intel-vs-nvidia`, `theme-most-profitable` and `theme-ai-race` each
+score 1.00 ticker coverage, while `theme-deepseek` and `theme-market-mood`
+return **zero hits** — the absolute gate refuses them outright. Likewise
+`para-streaming-sports` and `para-wall-street-mood` are refusals, not
+ranking misses. So the absolute gate refuses 2 of 8 paraphrases and 2 of 5
+thematic questions: that is the measured price of refusing Boeing and
+Bitcoin 100 % of the time, on the same corpus, with the same constants. A
+gate loose enough to answer "What's the overall market mood?" is a gate
+loose enough to answer "What is the price of Bitcoin today?", and this
+project chose the other side of that line — visibly, with the cost printed
+in its own report rather than left out of it.
+
 Full output, including the per-question misses behind those numbers, is
 committed at [`examples/eval-report.txt`](examples/eval-report.txt). Two
-misses worth calling out rather than hiding: `intel-price-targets` scores
-0.00 recall because its three target articles are MT Newswires paywall stubs
-(~100 characters), which the retriever's truncation penalty deliberately
-down-ranks — the gate is trading recall on stub articles for not citing near-
-empty text as a source. The paraphrase tier's MRR of 0.43 against seeded's
-0.88 is the measured cost of having no embeddings — see
+more misses worth calling out rather than hiding: `intel-price-targets`
+scores 0.00 recall because its three target articles are MT Newswires
+paywall stubs (~100 characters), which the retriever's truncation penalty
+deliberately down-ranks — the gate is trading recall on stub articles for
+not citing near-empty text as a source. The paraphrase tier's MRR of 0.43
+against seeded's 0.88 is the measured cost of having no embeddings — see
 [Design decisions](#design-decisions).
 
 Coverage (`examples/coverage.txt`, regenerated with
 `pytest --cov=newschat --cov-report=term-missing`):
 
 ```
-TOTAL                                   1002     11    99%
+TOTAL                                   1014      7    99%
 ```
 
 Tests that exercise the live Claude CLI are marked `@pytest.mark.llm` and are
