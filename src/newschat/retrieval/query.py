@@ -1,19 +1,28 @@
 """Turn a question (plus recent history) into tickers and keywords.
 
 Alias tokens stay in `keywords`: "apple" is what separates Apple's 20 articles from the
-rest. Follow-ups inherit both the previous turn's tickers and its keywords — inheriting the
-ticker alone restores *which company* but loses *what the conversation was about*.
+rest. Follow-ups inherit both the previous turn's tickers and its topic — that turn's own
+keywords plus the context it had itself inherited, so the topic chains down a thread instead
+of being replaced by the last follow-up's words ("who wants to buy it?" twice in a row still
+carries "intel"). Inheriting the ticker alone restores *which company* but loses *what the
+conversation was about*.
 
-A question inherits only if it is anaphoric (a pronoun or "the company"-style reference) or
-it is short *and* every keyword is in the corpus vocabulary: a short question containing a
-word the corpus has never seen is about something else, and inheriting a ticker into it would
-smuggle it past the retriever's refusal gate.
+Inheritance comes in two strengths:
+
+* **strong** — the question is anaphoric (a pronoun or "the company"-style reference). The
+  retriever restricts to the inherited tickers first and lets them bypass the refusal gate.
+* **soft** — no reference word, but the question is short *and* every keyword is in the corpus
+  vocabulary ("And the price target?", "DeepSeek"). The tickers are only a ranking preference,
+  so a short new topic the corpus covers is not hard-locked to the previous company.
+
+A short question containing a word the corpus has never seen is about something else and does
+not inherit at all: inheriting a ticker into it would smuggle it past the refusal gate.
 """
 
 import re
 from collections.abc import Collection, Sequence
 
-from newschat.models import ChatTurn, ResolvedQuery
+from newschat.models import ChatTurn, Inheritance, ResolvedQuery
 from newschat.retrieval.aliases import find_tickers
 from newschat.text.tokenize import stem, tokenize
 
@@ -35,6 +44,9 @@ _ANAPHORA_RE = re.compile(
     re.IGNORECASE,
 )
 
+# The soft-inheritance note tells the reader to say "new topic" to drop the previous company.
+_RESET_RE = re.compile(r"\bnew topic\b", re.IGNORECASE)
+
 
 class QueryAnalyzer:
     def __init__(
@@ -50,30 +62,39 @@ class QueryAnalyzer:
         tokens = tokenize(text)
         keywords = list(dict.fromkeys(t for t in tokens if t not in QUERY_STOPWORDS))
         context: list[str] = []
-        inherited = False
-        if not tickers and self._is_follow_up(text, tokens, keywords):
+        inheritance: Inheritance = "none"
+        strength: Inheritance = (
+            "none" if tickers else self._follow_up_strength(text, tokens, keywords)
+        )
+        if strength != "none":
             prior = self._last_with_tickers(history)
             if prior is not None:
                 tickers = list(prior.tickers)
-                inherited = True
-                context = [k for k in prior.keywords if k not in keywords]
+                inheritance = strength
+                topic = dict.fromkeys([*prior.keywords, *prior.context_keywords])
+                context = [k for k in topic if k not in keywords]
         return ResolvedQuery(
             text=text,
             tickers=tickers,
             keywords=keywords,
             context_keywords=context,
-            inherited_tickers=inherited,
+            inherited_tickers=inheritance != "none",
+            inheritance=inheritance,
         )
 
     def is_anaphoric(self, question: str, tokens: Sequence[str]) -> bool:
         """Whether the question *looks* like a follow-up: a reference word, or just short."""
         return bool(_ANAPHORA_RE.search(question)) or len(tokens) <= self.max_short_tokens
 
-    def _is_follow_up(self, question: str, tokens: Sequence[str], keywords: Sequence[str]) -> bool:
+    def _follow_up_strength(
+        self, question: str, tokens: Sequence[str], keywords: Sequence[str]
+    ) -> Inheritance:
+        if _RESET_RE.search(question):
+            return "none"
         if _ANAPHORA_RE.search(question):
-            return True
+            return "strong"
         short = len(tokens) <= self.max_short_tokens
-        return short and self._is_known_short_question(keywords)
+        return "soft" if short and self._is_known_short_question(keywords) else "none"
 
     def _is_known_short_question(self, keywords: Sequence[str]) -> bool:
         """Whether every word of a short question is one the corpus actually uses.

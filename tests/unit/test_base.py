@@ -10,6 +10,7 @@ from newschat.summarize.base import (
     check_faithfulness,
     cited_numbers,
     envelope,
+    inherited_note,
     make_citations,
     not_covered_answer,
     strip_invalid_citations,
@@ -56,6 +57,22 @@ def test_envelope_adds_inherited_note() -> None:
     ans = envelope(body="Body.", citations=[], backend="x", query=q, covered=True, info=INFO)
     assert "(Interpreting the follow-up as being about INTC.)" in ans.text
     assert ans.text.index("Interpreting") < ans.text.index("Body.")
+
+
+def test_strong_inheritance_note() -> None:
+    q = ResolvedQuery(text="q", tickers=["INTC"], inherited_tickers=True, inheritance="strong")
+    assert inherited_note(q) == "(Interpreting the follow-up as being about INTC.)"
+
+
+def test_soft_inheritance_note_offers_a_reset() -> None:
+    q = ResolvedQuery(text="q", tickers=["NVDA"], inherited_tickers=True, inheritance="soft")
+    assert inherited_note(q) == (
+        '(Reading this as a follow-up about NVDA; say "new topic" or name a company to reset.)'
+    )
+
+
+def test_no_note_without_inheritance() -> None:
+    assert inherited_note(ResolvedQuery(text="q", tickers=["INTC"])) is None
 
 
 def test_not_covered_answer() -> None:

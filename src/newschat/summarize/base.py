@@ -54,8 +54,16 @@ def not_covered_text(info: CorpusInfo) -> str:
 
 
 def inherited_note(query: ResolvedQuery) -> str | None:
-    if query.inherited_tickers and query.tickers:
-        return f"(Interpreting the follow-up as being about {', '.join(query.tickers)}.)"
+    if not query.tickers:
+        return None
+    tickers = ", ".join(query.tickers)
+    if query.inheritance == "soft":
+        return (
+            f'(Reading this as a follow-up about {tickers}; say "new topic" or name a company '
+            "to reset.)"
+        )
+    if query.inherited_tickers:
+        return f"(Interpreting the follow-up as being about {tickers}.)"
     return None
 
 

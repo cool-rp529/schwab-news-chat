@@ -50,6 +50,7 @@ def test_follow_up_across_requests(client: TestClient) -> None:
     ).json()
     assert body["session_id"] == sid
     assert body["answer"]["query"]["inherited_tickers"] is True
+    assert body["answer"]["query"]["inheritance"] == "strong"
     assert body["answer"]["query"]["tickers"] == ["INTC"]
 
 

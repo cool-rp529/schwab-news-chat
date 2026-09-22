@@ -103,3 +103,54 @@ def test_inheritance_walks_back_past_a_refused_turn(service: ChatService) -> Non
     service.ask(sid, "What is the price of Bitcoin today?")
     ans = service.ask(sid, "Who wants to buy it?")
     assert ans.query.inherited_tickers is True and ans.query.tickers == ["INTC"]
+
+
+# ---- follow-up chaining and inheritance strength, on the real corpus ----
+
+
+def test_pronoun_less_new_topic_is_not_locked_to_the_previous_company(
+    service: ChatService, corpus: Corpus
+) -> None:
+    # "DeepSeek" is one known word, so it soft-inherits INTC. Before soft inheritance it was
+    # restricted to Intel articles and came back with the identical Intel answer.
+    sid = SessionStore.new_id()
+    intel = service.ask(sid, "What's going on with Intel?")
+    ans = service.ask(sid, "DeepSeek")
+    assert ans.covered and ans.citations
+    assert ans.query.inheritance == "soft"
+    assert "Reading this as a follow-up about INTC" in ans.text
+    intel_titles = {c.title for c in intel.citations}
+    titles = {c.title for c in ans.citations}
+    assert any("deepseek" in t.lower() for t in titles) or not titles <= intel_titles
+    bodies = {a.id: a.text.lower() for a in corpus.articles}
+    assert all("deepseek" in bodies[c.article_id] for c in ans.citations)
+
+
+def test_soft_follow_up_keeps_the_company_when_it_fits(service: ChatService) -> None:
+    sid = SessionStore.new_id()
+    service.ask(sid, "What do analysts expect from Nvidia's earnings?")
+    ans = service.ask(sid, "And the price target?")
+    assert ans.covered and ans.citations
+    assert ans.query.tickers == ["NVDA"] and ans.query.inheritance == "soft"
+    assert "nvidia" in ans.citations[0].title.lower()
+
+
+def test_topic_survives_a_refused_turn_and_a_repeated_follow_up(service: ChatService) -> None:
+    # The second "who wants to buy it?" used to inherit only [want, buy], lose "intel", and
+    # surface "Buy rating" pieces on ASML and AMD.
+    sid = SessionStore.new_id()
+    service.ask(sid, "What's going on with Intel?")
+    service.ask(sid, "Who wants to buy it?")
+    assert service.ask(sid, "What is the price of Bitcoin today?").covered is False
+    ans = service.ask(sid, "Who wants to buy it?")
+    assert ans.covered and ans.citations
+    assert ans.query.inheritance == "strong" and "intel" in ans.query.context_keywords
+    assert all("INTC" in c.tickers for c in ans.citations), [c.title for c in ans.citations]
+    assert not any("ASML" in c.title or "AMD" in c.title for c in ans.citations)
+
+
+def test_out_of_corpus_question_does_not_inherit_at_all(service: ChatService) -> None:
+    sid = SessionStore.new_id()
+    service.ask(sid, "What's going on with Intel?")
+    ans = service.ask(sid, "What is the price of Bitcoin today?")
+    assert ans.covered is False and ans.query.inheritance == "none"

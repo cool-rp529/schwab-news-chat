@@ -60,11 +60,18 @@ Informational summary of news coverage — not investment advice.
 ```
 
 A follow-up in the same session — "who might buy it?" — has no ticker of its
-own, so the query analyzer inherits both the ticker and the prior keywords
-from the last turn that had them, and the answer says so explicitly:
+own, so the query analyzer inherits the ticker and the thread's topic (the
+prior turn's keywords plus whatever context that turn had itself inherited)
+from the last turn that had a ticker, and the answer says so explicitly:
 `(Interpreting the follow-up as being about INTC.)`. That inherited-resolution
 note is the only way a reader can tell the anaphora was resolved at all,
-rather than silently answering about the wrong company. A short follow-up
+rather than silently answering about the wrong company. A follow-up with a
+reference word ("it", "the company") inherits strongly: retrieval is
+restricted to the inherited ticker first. A short follow-up with no reference
+word ("And the price target?", "DeepSeek") inherits softly: the ticker only
+boosts the ranking, so a short new topic still reaches its own articles, and
+the note offers a reset — `(Reading this as a follow-up about INTC; say "new
+topic" or name a company to reset.)`. A short follow-up
 inherits the previous ticker only when every word in it is in the corpus
 vocabulary — "What's the Bitcoin price?" after an Intel question is treated as
 a new (and refused) question, not as a follow-up, so an inherited ticker can

@@ -3,7 +3,7 @@ import re
 import pytest
 
 from newschat.ingest.corpus import Corpus
-from newschat.models import Article, ResolvedQuery
+from newschat.models import Article, Inheritance, ResolvedQuery
 from newschat.retrieval.query import QueryAnalyzer
 from newschat.retrieval.retriever import Retriever, RetrieverConfig
 from newschat.text.sentences import is_prose, split_sentences
@@ -213,3 +213,35 @@ def test_known_terms_is_the_real_corpus_vocabulary(real: Retriever) -> None:
     # What the query analyzer checks a short follow-up's words against.
     assert "intel" in real.known_terms
     assert "bitcoin" not in real.known_terms
+
+
+# ---- inheritance strength: soft tickers are a ranking preference, strong ones restrict ----
+
+
+def inherited(inheritance: Inheritance, keywords: list[str]) -> ResolvedQuery:
+    return ResolvedQuery(
+        text="follow-up",
+        tickers=["INTC"],
+        keywords=keywords,
+        inherited_tickers=True,
+        inheritance=inheritance,
+    )
+
+
+def test_soft_inheritance_ranks_purely_by_score() -> None:
+    # No gate, so only the ordering is under test. a0 (INTC) matches "broadcom" alone; a4
+    # (MSFT) matches both terms and outscores a0 even after a0's ticker boost.
+    ungated = Retriever(MINI, RetrieverConfig(min_strength=0.0, min_coverage=0.0))
+    ids = [h.article.id for h in ungated.search(inherited("soft", ["broadcom", "chip"]))]
+    assert ids[:2] == ["a4", "a0"]
+
+
+def test_soft_inheritance_does_not_let_a_ticker_match_bypass_the_gate(mini: Retriever) -> None:
+    # a0 is INTC-tagged but covers too little of the question to clear the gate on its own.
+    ids = [h.article.id for h in mini.search(inherited("soft", ["broadcom", "chip"]))]
+    assert ids == ["a4"]
+
+
+def test_strong_inheritance_keeps_restriction_and_gate_bypass(mini: Retriever) -> None:
+    ids = [h.article.id for h in mini.search(inherited("strong", ["broadcom", "chip"]))]
+    assert ids == ["a0", "a4"]  # the ticker match leads, past the gate, then the top-up

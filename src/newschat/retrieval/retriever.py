@@ -5,6 +5,10 @@ Refusal: relative filtering alone can never refuse (the top hit is 1.0 by constr
 absolute gate runs first: idf-normalised match strength >= `min_strength` and idf-weighted keyword
 coverage >= `min_coverage`, unless the article ticker-matches the query.
 
+A soft-inherited follow-up (see `retrieval/query.py`) treats its tickers as a ranking preference
+only: ticker matches still get the boost, but they must clear the gate like any other article and
+are not restricted to first — so "DeepSeek" after an Intel question is answered about DeepSeek.
+
 Strength is `raw / total_idf`, not raw BM25. Raw BM25 sums over query terms, so a fixed raw floor
 measures how many rare words a question happens to contain rather than how well the corpus answers
 it: a one-term query is bounded by about `idf * (k1 + 1)` and can never clear a floor calibrated on
@@ -76,6 +80,8 @@ class Retriever:
         raw_scores = self.index.score(own + ctx, weights)
         total_idf = sum(self.index.idf(t) for t in own)
         wanted = set(q.tickers)
+        # Soft inheritance: tickers boost the ranking but neither bypass the gate nor restrict.
+        hard = q.inheritance != "soft"
 
         candidates: list[_Candidate] = []
         for i, article in enumerate(self.corpus.articles):
@@ -90,7 +96,7 @@ class Retriever:
                 bool(wanted & set(article.tickers))
                 or any(mentions(article.text, t) for t in wanted)
             )
-            if not ticker_match:
+            if not (ticker_match and hard):
                 coverage = (
                     sum(self.index.idf(t) for t in matched_own) / total_idf if total_idf else 0.0
                 )
@@ -103,7 +109,7 @@ class Retriever:
             candidates.append(_Candidate(score, raw, matched, ticker_match, i))
 
         candidates.sort(key=lambda c: (-c.score, c.index))
-        if wanted:
+        if wanted and hard:
             restricted = [c for c in candidates if c.ticker_match]
             top_up = [c for c in candidates if not c.ticker_match]
             chosen = (restricted + top_up)[:k]

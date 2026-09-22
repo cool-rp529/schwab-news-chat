@@ -5,6 +5,10 @@ from typing import Literal
 from pydantic import BaseModel, Field, computed_field
 
 ClaimKind = Literal["event", "opinion", "promo"]
+# How a follow-up came by its tickers: "strong" (an explicit reference such as "it" or "the
+# company") restricts retrieval to them; "soft" (a short question with no reference word)
+# only prefers them in the ranking.
+Inheritance = Literal["none", "strong", "soft"]
 
 
 class Article(BaseModel):
@@ -41,9 +45,11 @@ class ResolvedQuery(BaseModel):
     text: str
     tickers: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
-    # Keywords carried over from the previous turn; scored at half weight by the retriever.
+    # Keywords carried over from the thread's earlier turns; scored at half weight by the
+    # retriever.
     context_keywords: list[str] = Field(default_factory=list)
-    inherited_tickers: bool = False
+    inherited_tickers: bool = False  # true for both strong and soft inheritance
+    inheritance: Inheritance = "none"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

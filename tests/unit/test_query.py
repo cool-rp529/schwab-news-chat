@@ -1,9 +1,15 @@
+import pytest
+
 from newschat.models import Answer, ChatTurn, ResolvedQuery
 from newschat.retrieval.query import QUERY_STOPWORDS, QueryAnalyzer
 
 
-def turn(question: str, tickers: list[str], keywords: list[str]) -> ChatTurn:
-    q = ResolvedQuery(text=question, tickers=tickers, keywords=keywords)
+def turn(
+    question: str, tickers: list[str], keywords: list[str], context: list[str] | None = None
+) -> ChatTurn:
+    q = ResolvedQuery(
+        text=question, tickers=tickers, keywords=keywords, context_keywords=context or []
+    )
     return ChatTurn(
         question=question,
         answer=Answer(
@@ -50,12 +56,14 @@ def test_follow_up_inherits_tickers_and_keywords() -> None:
     assert q.tickers == ["INTC"] and q.inherited_tickers is True
     assert q.keywords == ["want", "buy"]
     assert q.context_keywords == ["intel"] and q.inherited_keywords is True
+    assert q.inheritance == "strong"
 
 
 def test_short_question_without_anaphora_still_inherits() -> None:
     history = [turn("Nvidia earnings?", ["NVDA"], ["nvidia", "earning"])]
     q = QueryAnalyzer().resolve("And the price target?", history)
     assert q.tickers == ["NVDA"] and q.context_keywords == ["nvidia", "earning"]
+    assert q.inheritance == "soft" and q.inherited_tickers is True
 
 
 def test_naming_a_ticker_blocks_inheritance() -> None:
@@ -127,3 +135,57 @@ def test_without_known_terms_short_questions_inherit_on_length_alone() -> None:
     history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
     q = QueryAnalyzer().resolve("What is the price of Bitcoin today?", history)
     assert q.tickers == ["INTC"] and q.inherited_tickers is True
+
+
+# ---- inheritance strength and topic chaining ----
+
+
+def test_new_question_has_no_inheritance() -> None:
+    q = QueryAnalyzer(known_terms=KNOWN).resolve("What's going on with Intel?", [])
+    assert q.inheritance == "none" and q.inherited_tickers is False
+
+
+@pytest.mark.parametrize(
+    ("question", "inheritance"),
+    [
+        ("Who wants to buy it?", "strong"),  # pronoun
+        ("Did the company buy anything?", "strong"),  # "the company"
+        ("Did it beat Bitcoin?", "strong"),  # a pronoun wins over an unknown word
+        ("And the price target?", "soft"),  # short, every word known, no reference word
+        ("Price target", "soft"),
+        ("What is the price of Bitcoin today?", "none"),  # short but "bitcoin" is unknown
+        ("Which retailers are affected by the February 28 economic boycott?", "none"),  # long
+        # The reset phrase the soft note offers; "topic" is a corpus word, so without the
+        # reset this would soft-inherit on length alone.
+        ("New topic: price target", "none"),
+    ],
+)
+def test_inheritance_strength(question: str, inheritance: str) -> None:
+    history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
+    q = QueryAnalyzer(known_terms=KNOWN | {"topic"}).resolve(question, history)
+    assert q.inheritance == inheritance
+    assert q.inherited_tickers is (inheritance != "none")
+    assert q.tickers == ([] if inheritance == "none" else ["INTC"])
+
+
+def test_context_chains_through_an_earlier_follow_up() -> None:
+    # The first follow-up's own words are [want, buy]; "intel" lives only in its context.
+    # Inheriting keywords alone would lose "intel" on the second follow-up.
+    history = [
+        turn("What's going on with Intel?", ["INTC"], ["intel"]),
+        turn("Who wants to buy it", ["INTC"], ["want", "buy"], context=["intel"]),
+        turn("What is the price of Bitcoin today?", [], ["price", "bitcoin"]),
+    ]
+    q = QueryAnalyzer(known_terms=KNOWN).resolve("Who wants to buy it?", history)
+    assert q.inheritance == "strong" and q.tickers == ["INTC"]
+    assert q.keywords == ["want", "buy"] and q.context_keywords == ["intel"]
+
+
+def test_chained_context_keeps_order_and_dedupes() -> None:
+    history = [
+        turn("Intel?", ["INTC"], ["intel"]),
+        turn("Who wants to buy it", ["INTC"], ["want", "buy", "intel"], context=["intel"]),
+    ]
+    q = QueryAnalyzer(known_terms=KNOWN | {"deepseek"}).resolve("DeepSeek", history)
+    assert q.inheritance == "soft"
+    assert q.context_keywords == ["want", "buy", "intel"]
