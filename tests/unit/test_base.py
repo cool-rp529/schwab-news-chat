@@ -1,4 +1,4 @@
-from newschat.models import Answer, Article, ChatTurn, Hit, ResolvedQuery
+from newschat.models import Answer, Article, ChatTurn, Citation, Hit, ResolvedQuery
 from newschat.summarize.base import (
     ADVISORY,
     EXCERPT_CLOSE,
@@ -12,6 +12,7 @@ from newschat.summarize.base import (
     envelope,
     inherited_note,
     make_citations,
+    new_topic_answer,
     not_covered_answer,
     strip_invalid_citations,
 )
@@ -59,16 +60,40 @@ def test_envelope_adds_inherited_note() -> None:
     assert ans.text.index("Interpreting") < ans.text.index("Body.")
 
 
-def test_strong_inheritance_note() -> None:
+def cite(tickers: list[str]) -> Citation:
+    return Citation(n=1, article_id="a", title="t", url="u", tickers=tickers, passage="p")
+
+
+def test_strong_inheritance_note_is_unconditional() -> None:
     q = ResolvedQuery(text="q", tickers=["INTC"], inherited_tickers=True, inheritance="strong")
-    assert inherited_note(q) == "(Interpreting the follow-up as being about INTC.)"
+    expected = "(Interpreting the follow-up as being about INTC.)"
+    assert inherited_note(q) == expected
+    assert inherited_note(q, [cite(["AAPL"])]) == expected
 
 
-def test_soft_inheritance_note_offers_a_reset() -> None:
+def test_soft_note_when_a_citation_carries_the_inherited_ticker() -> None:
     q = ResolvedQuery(text="q", tickers=["NVDA"], inherited_tickers=True, inheritance="soft")
-    assert inherited_note(q) == (
+    assert inherited_note(q, [cite(["AAPL"]), cite(["AAPL", "NVDA"])]) == (
         '(Reading this as a follow-up about NVDA; say "new topic" or name a company to reset.)'
     )
+
+
+def test_soft_note_omitted_when_no_citation_carries_the_inherited_ticker() -> None:
+    # "DeepSeek" after an Intel question cites IBM/AAPL/NVDA articles: not about INTC.
+    q = ResolvedQuery(text="q", tickers=["INTC"], inherited_tickers=True, inheritance="soft")
+    assert inherited_note(q, [cite(["IBM"]), cite(["AAPL"])]) is None
+    assert inherited_note(q) is None
+    ans = envelope(
+        body="Body.", citations=[cite(["IBM"])], backend="x", query=q, covered=True, info=INFO
+    )
+    assert "Reading this" not in ans.text
+
+
+def test_new_topic_answer_is_framed_by_the_envelope() -> None:
+    ans = new_topic_answer(ResolvedQuery(text="new topic"), "extractive", INFO)
+    assert ans.covered is False and ans.citations == []
+    assert "Okay — starting a new topic. Ask about any of AAPL, INTC." in ans.text
+    assert ans.text.startswith(as_of_line("February 2025")) and ans.text.endswith(ADVISORY)
 
 
 def test_no_note_without_inheritance() -> None:

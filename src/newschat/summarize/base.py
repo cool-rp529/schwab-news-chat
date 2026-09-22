@@ -53,11 +53,20 @@ def not_covered_text(info: CorpusInfo) -> str:
     )
 
 
-def inherited_note(query: ResolvedQuery) -> str | None:
+def inherited_note(query: ResolvedQuery, citations: Sequence[Citation] = ()) -> str | None:
+    """The line telling the reader which company a follow-up was read as being about.
+
+    A soft follow-up's tickers only steer the ranking, so the note is shown only when at least
+    one citation actually carries an inherited ticker: "DeepSeek" after an Intel question that
+    cites no Intel article is not "a follow-up about INTC".
+    """
     if not query.tickers:
         return None
     tickers = ", ".join(query.tickers)
     if query.inheritance == "soft":
+        wanted = set(query.tickers)
+        if not any(wanted & set(c.tickers) for c in citations):
+            return None
         return (
             f'(Reading this as a follow-up about {tickers}; say "new topic" or name a company '
             "to reset.)"
@@ -77,7 +86,7 @@ def envelope(
     info: CorpusInfo,
 ) -> Answer:
     parts = [as_of_line(info.period)]
-    note = inherited_note(query)
+    note = inherited_note(query, citations)
     if note:
         parts.append(note)
     parts.extend([body.strip(), ADVISORY])
@@ -89,6 +98,21 @@ def envelope(
         covered=covered,
         as_of=info.period,
         advisory=ADVISORY,
+    )
+
+
+def new_topic_text(info: CorpusInfo) -> str:
+    return f"Okay — starting a new topic. Ask about any of {', '.join(info.tickers)}."
+
+
+def new_topic_answer(query: ResolvedQuery, backend: str, info: CorpusInfo) -> Answer:
+    return envelope(
+        body=new_topic_text(info),
+        citations=[],
+        backend=backend,
+        query=query,
+        covered=False,
+        info=info,
     )
 
 

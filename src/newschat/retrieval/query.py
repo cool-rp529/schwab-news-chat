@@ -45,14 +45,26 @@ _ANAPHORA_RE = re.compile(
 )
 
 # The soft-inheritance note tells the reader to say "new topic" to drop the previous company.
+# A turn containing it also ends the thread: later follow-ups never inherit from behind it.
 _RESET_RE = re.compile(r"\bnew topic\b", re.IGNORECASE)
+_RESET_TOKENS = frozenset(tokenize("new topic"))
+
+
+def is_reset(question: str) -> bool:
+    """Whether the question contains the "new topic" phrase that ends the current thread."""
+    return _RESET_RE.search(question) is not None
 
 
 class QueryAnalyzer:
     def __init__(
-        self, max_short_tokens: int = 4, known_terms: Collection[str] | None = None
+        self,
+        max_short_tokens: int = 4,
+        known_terms: Collection[str] | None = None,
+        max_context_keywords: int = 8,
     ) -> None:
         self.max_short_tokens = max_short_tokens
+        # Carried context is ordered most recent turn first; the cap drops the oldest words.
+        self.max_context_keywords = max_context_keywords
         # None means "no vocabulary check": short questions inherit on length alone.
         self.known_terms = known_terms
 
@@ -60,7 +72,12 @@ class QueryAnalyzer:
         text = question.strip()
         tickers = find_tickers(text)
         tokens = tokenize(text)
-        keywords = list(dict.fromkeys(t for t in tokens if t not in QUERY_STOPWORDS))
+        reset = is_reset(text)
+        keywords = list(
+            dict.fromkeys(
+                t for t in tokens if t not in QUERY_STOPWORDS and not (reset and t in _RESET_TOKENS)
+            )
+        )
         context: list[str] = []
         inheritance: Inheritance = "none"
         strength: Inheritance = (
@@ -72,7 +89,7 @@ class QueryAnalyzer:
                 tickers = list(prior.tickers)
                 inheritance = strength
                 topic = dict.fromkeys([*prior.keywords, *prior.context_keywords])
-                context = [k for k in topic if k not in keywords]
+                context = [k for k in topic if k not in keywords][: self.max_context_keywords]
         return ResolvedQuery(
             text=text,
             tickers=tickers,
@@ -109,6 +126,8 @@ class QueryAnalyzer:
     @staticmethod
     def _last_with_tickers(history: Sequence[ChatTurn]) -> ResolvedQuery | None:
         for turn in reversed(history):
+            if is_reset(turn.question):
+                return None
             if turn.answer.query.tickers:
                 return turn.answer.query
         return None

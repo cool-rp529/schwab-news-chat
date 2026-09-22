@@ -70,8 +70,10 @@ reference word ("it", "the company") inherits strongly: retrieval is
 restricted to the inherited ticker first. A short follow-up with no reference
 word ("And the price target?", "DeepSeek") inherits softly: the ticker only
 boosts the ranking, so a short new topic still reaches its own articles, and
-the note offers a reset — `(Reading this as a follow-up about INTC; say "new
-topic" or name a company to reset.)`. A short follow-up
+the note — `(Reading this as a follow-up about INTC; say "new topic" or name a
+company to reset.)` — appears only when an inherited-ticker article is actually
+cited. Saying "new topic" ends the thread, and the carried topic is capped at
+its eight most recent words. A short follow-up
 inherits the previous ticker only when every word in it is in the corpus
 vocabulary — "What's the Bitcoin price?" after an Intel question is treated as
 a new (and refused) question, not as a follow-up, so an inherited ticker can

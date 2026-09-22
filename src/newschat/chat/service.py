@@ -5,9 +5,14 @@ import logging
 from newschat.chat.session import SessionStore
 from newschat.ingest.corpus import Corpus
 from newschat.models import Answer, ChatTurn
-from newschat.retrieval.query import QueryAnalyzer
+from newschat.retrieval.query import QueryAnalyzer, is_reset
 from newschat.retrieval.retriever import Retriever
-from newschat.summarize.base import CorpusInfo, Summarizer, SummarizerUnavailable
+from newschat.summarize.base import (
+    CorpusInfo,
+    Summarizer,
+    SummarizerUnavailable,
+    new_topic_answer,
+)
 from newschat.summarize.extractive import ExtractiveSummarizer
 from newschat.summarize.factory import build_summarizer
 
@@ -56,6 +61,11 @@ class ChatService:
 
         history = self.sessions.get(session_id)
         resolved = self.analyzer.resolve(text, history)
+        if is_reset(text) and not resolved.keywords and not resolved.tickers:
+            # A bare "new topic": acknowledge it rather than searching for nothing.
+            answer = new_topic_answer(resolved, self.primary.name, self.info)
+            history.append(ChatTurn(question=text, answer=answer))
+            return answer
         hits = self.retriever.search(resolved)
         try:
             answer = self.primary.summarize(resolved, hits, list(history))

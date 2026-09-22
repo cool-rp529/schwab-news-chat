@@ -118,7 +118,9 @@ def test_pronoun_less_new_topic_is_not_locked_to_the_previous_company(
     ans = service.ask(sid, "DeepSeek")
     assert ans.covered and ans.citations
     assert ans.query.inheritance == "soft"
-    assert "Reading this as a follow-up about INTC" in ans.text
+    # No cited article is tagged INTC, so claiming "a follow-up about INTC" would be false.
+    assert all("INTC" not in c.tickers for c in ans.citations)
+    assert "Reading this as a follow-up" not in ans.text
     intel_titles = {c.title for c in intel.citations}
     titles = {c.title for c in ans.citations}
     assert any("deepseek" in t.lower() for t in titles) or not titles <= intel_titles
@@ -154,3 +156,16 @@ def test_out_of_corpus_question_does_not_inherit_at_all(service: ChatService) ->
     service.ask(sid, "What's going on with Intel?")
     ans = service.ask(sid, "What is the price of Bitcoin today?")
     assert ans.covered is False and ans.query.inheritance == "none"
+
+
+def test_new_topic_is_acknowledged_and_ends_the_thread(service: ChatService) -> None:
+    sid = SessionStore.new_id()
+    service.ask(sid, "What's going on with Intel?")
+    reset = service.ask(sid, "New topic")
+    assert reset.covered is False and reset.citations == []
+    assert "starting a new topic" in reset.text and reset.text.endswith(ADVISORY)
+    assert reset.query.inheritance == "none" and "Interpreting" not in reset.text
+    # A short, all-known question that would otherwise soft-inherit INTC.
+    ans = service.ask(sid, "And the price target?")
+    assert ans.query.inheritance == "none" and ans.query.tickers == []
+    assert ans.query.context_keywords == []

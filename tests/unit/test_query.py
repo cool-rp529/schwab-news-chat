@@ -189,3 +189,26 @@ def test_chained_context_keeps_order_and_dedupes() -> None:
     q = QueryAnalyzer(known_terms=KNOWN | {"deepseek"}).resolve("DeepSeek", history)
     assert q.inheritance == "soft"
     assert q.context_keywords == ["want", "buy", "intel"]
+
+
+def test_carried_context_is_capped_at_the_most_recent_eight() -> None:
+    # A long pronoun chain: each follow-up adds two words of its own.
+    analyzer = QueryAnalyzer()
+    history = [turn("Intel?", ["INTC"], ["intel"])]
+    words = [f"w{i}" for i in range(12)]
+    for a, b in zip(words[::2], words[1::2], strict=True):
+        q = analyzer.resolve(f"Did it {a} {b}?", history)
+        assert len(q.context_keywords) <= 8
+        history.append(turn(q.text, q.tickers, q.keywords, context=q.context_keywords))
+    last = analyzer.resolve("Did it grow?", history)
+    # Most recent first; the oldest words ("intel", w0...) are the ones dropped.
+    assert last.context_keywords == ["w10", "w11", "w8", "w9", "w6", "w7", "w4", "w5"]
+
+
+def test_reset_turn_ends_the_thread() -> None:
+    history = [
+        turn("What's going on with Intel?", ["INTC"], ["intel"]),
+        turn("New topic", [], []),
+    ]
+    q = QueryAnalyzer(known_terms=KNOWN).resolve("Who wants to buy it?", history)
+    assert q.inheritance == "none" and q.tickers == [] and q.context_keywords == []
