@@ -39,7 +39,7 @@ _DOT = "\u0001"  # placeholder for a protected full stop
 _ABBR_RE = re.compile(r"\b(" + "|".join(re.escape(a) for a in _ABBREVIATIONS) + r")\.")
 _INITIAL_RE = re.compile(r"\b([A-Z])\.(?=\s[A-Z])")
 _DECIMAL_RE = re.compile(r"(?<=\d)\.(?=\d)")
-_SPLIT_RE = re.compile(r"(?:(?<=[.!?])|(?<=[.!?][”’)]))\s+(?=[“(\[$A-Z0-9])")
+_SPLIT_RE = re.compile('(?:(?<=[.!?])|(?<=[.!?]["\\u201d\\u2019]))\\s+(?=["\\u201c(\\[\\$A-Z0-9])')
 _TIME_RE = re.compile(r"\b\d{1,2}:\d{2}\b")
 
 
