@@ -179,3 +179,9 @@ def test_real_passages_never_contain_carousel_or_stamps(real: Retriever) -> None
     assert any(
         " ago" in s for a in real.corpus.articles for s in split_sentences(a.text) if is_prose(s)
     )
+
+
+def test_known_terms_is_the_real_corpus_vocabulary(real: Retriever) -> None:
+    # What the query analyzer checks a short follow-up's words against.
+    assert "intel" in real.known_terms
+    assert "bitcoin" not in real.known_terms

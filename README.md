@@ -64,7 +64,11 @@ own, so the query analyzer inherits both the ticker and the prior keywords
 from the last turn that had them, and the answer says so explicitly:
 `(Interpreting the follow-up as being about INTC.)`. That inherited-resolution
 note is the only way a reader can tell the anaphora was resolved at all,
-rather than silently answering about the wrong company. More transcripts,
+rather than silently answering about the wrong company. A short follow-up
+inherits the previous ticker only when every word in it is in the corpus
+vocabulary — "What's the Bitcoin price?" after an Intel question is treated as
+a new (and refused) question, not as a follow-up, so an inherited ticker can
+never carry an out-of-corpus question past the refusal gate. More transcripts,
 including four captured against the Claude CLI backend, are committed in
 [`examples/transcripts.md`](examples/transcripts.md).
 
@@ -311,7 +315,7 @@ request.
 | Refusal gated on an absolute score, not a relative one | Relative floor only | Top-score normalisation makes the best-scoring hit 1.0 by construction, so a relative floor alone can never refuse |
 | Dedupe keeps the longest body among duplicates | Keep the first occurrence | Four duplicate groups have genuinely divergent bodies; "first" is just a dict-ordering coin flip |
 | Ticker key used as a retrieval boost, not a hard filter | Filter articles by ticker | Many articles filed under a ticker are off-topic for it; article text is more trustworthy than the filing key |
-| Follow-up resolution by deterministic ticker/keyword inheritance | LLM-based query rewriting | Fully deterministic, testable, and works with no network access |
+| Follow-up resolution by deterministic ticker/keyword inheritance, gated on corpus vocabulary | LLM-based query rewriting | Fully deterministic, testable, and works with no network access; the vocabulary gate stops a short out-of-corpus question inheriting a ticker and bypassing refusal |
 | Claim-type classification is rules-based on the default path | LLM-labelled classification | The classifier has to be visible and assertable on the backend a keyless reviewer runs; rules are coarser but measurable |
 | Keep the `ask` CLI subcommand and test all three subcommands | Drop `ask`, ship only `serve` | `ask` is what generates the committed transcripts, and a dedicated `cli` test module closes a coverage gap that would otherwise exist |
 

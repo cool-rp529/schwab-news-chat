@@ -39,7 +39,9 @@ class ChatService:
     def from_corpus(cls, corpus: Corpus, backend: str | None = None) -> "ChatService":
         info = CorpusInfo(period=corpus.infer_period(), tickers=tuple(corpus.tickers))
         primary, fallback = build_summarizer(info, backend)
-        return cls(QueryAnalyzer(), Retriever(corpus), primary, fallback, SessionStore(), info)
+        retriever = Retriever(corpus)
+        analyzer = QueryAnalyzer(known_terms=retriever.known_terms)
+        return cls(analyzer, retriever, primary, fallback, SessionStore(), info)
 
     @property
     def backend(self) -> str:

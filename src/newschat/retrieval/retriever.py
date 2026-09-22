@@ -53,6 +53,11 @@ class Retriever:
             [s for s in split_sentences(a.text) if is_prose(s)] for a in corpus.articles
         ]
 
+    @property
+    def known_terms(self) -> frozenset[str]:
+        """The corpus vocabulary, for callers that need to spot out-of-corpus words."""
+        return self.index.terms()
+
     def search(self, q: ResolvedQuery, k: int | None = None) -> list[Hit]:
         k = k or self.config.k
         own = list(dict.fromkeys(q.keywords))

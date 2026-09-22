@@ -25,6 +25,10 @@ class BM25Index:
             for length in self._lengths
         ]
 
+    def terms(self) -> frozenset[str]:
+        """The indexed vocabulary: every term that occurs in at least one document."""
+        return frozenset(self._df)
+
     def df(self, term: str) -> int:
         return self._df.get(term, 0)
 

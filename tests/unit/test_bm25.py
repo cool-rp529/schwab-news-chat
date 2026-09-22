@@ -25,6 +25,12 @@ def test_df_and_idf_monotone(index: BM25Index) -> None:
     assert index.idf("missing") == pytest.approx(math.log((4 + 0.5) / 0.5 + 1))
 
 
+def test_terms_is_the_indexed_vocabulary(index: BM25Index) -> None:
+    assert index.terms() == {t for doc in DOCS for t in doc}
+    assert "missing" not in index.terms()
+    assert BM25Index([]).terms() == frozenset()
+
+
 def test_unknown_term_scores_zero_everywhere(index: BM25Index) -> None:
     assert index.score(["missing"]) == [0.0] * 4
 

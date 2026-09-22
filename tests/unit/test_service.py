@@ -81,3 +81,25 @@ def test_advice_question_still_carries_advisory(service: ChatService) -> None:
     ans = service.ask(SessionStore.new_id(), "Should I buy Nvidia stock?")
     assert ans.text.endswith(ADVISORY)
     assert ans.advisory == ADVISORY
+
+
+def test_out_of_corpus_question_mid_session_is_refused_not_inherited(
+    service: ChatService,
+) -> None:
+    # Before the vocabulary check, this short question inherited INTC from the Intel turn
+    # and came back with five confidently cited Intel articles.
+    sid = SessionStore.new_id()
+    service.ask(sid, "What's going on with Intel?")
+    ans = service.ask(sid, "What is the price of Bitcoin today?")
+    assert ans.covered is False and ans.citations == []
+    assert ans.query.inherited_tickers is False
+
+
+def test_inheritance_walks_back_past_a_refused_turn(service: ChatService) -> None:
+    # The Bitcoin turn recorded no tickers, so a genuine follow-up after it still
+    # resolves to the Intel turn rather than losing the thread.
+    sid = SessionStore.new_id()
+    service.ask(sid, "What's going on with Intel?")
+    service.ask(sid, "What is the price of Bitcoin today?")
+    ans = service.ask(sid, "Who wants to buy it?")
+    assert ans.query.inherited_tickers is True and ans.query.tickers == ["INTC"]

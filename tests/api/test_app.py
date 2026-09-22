@@ -78,3 +78,15 @@ def test_citation_article_ids_resolve(client: TestClient) -> None:
     ).json()["answer"]
     for c in answer["citations"]:
         assert client.get(f"/api/articles/{c['article_id']}").status_code == 200
+
+
+def test_out_of_corpus_follow_up_is_refused_across_requests(client: TestClient) -> None:
+    sid = client.post("/api/chat", json={"question": "What's going on with Intel?"}).json()[
+        "session_id"
+    ]
+    body = client.post(
+        "/api/chat", json={"question": "What is the price of Bitcoin today?", "session_id": sid}
+    ).json()
+    assert body["session_id"] == sid
+    assert body["answer"]["covered"] is False
+    assert body["answer"]["query"]["inherited_tickers"] is False

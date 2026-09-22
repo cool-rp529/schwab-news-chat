@@ -90,3 +90,40 @@ def test_context_excludes_repeated_keywords() -> None:
     history = [turn("Intel split?", ["INTC"], ["intel", "split"])]
     q = QueryAnalyzer().resolve("Is the split real?", history)
     assert q.keywords == ["split", "real"] and q.context_keywords == ["intel"]
+
+
+# The corpus vocabulary a real analyzer is wired with, reduced to the terms these cases need.
+KNOWN = {"intel", "price", "target", "want", "buy"}
+
+
+def test_known_short_follow_up_still_inherits() -> None:
+    history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
+    q = QueryAnalyzer(known_terms=KNOWN).resolve("And the price target?", history)
+    assert q.tickers == ["INTC"] and q.inherited_tickers is True
+    assert q.context_keywords == ["intel"]
+
+
+def test_short_question_with_out_of_corpus_word_does_not_inherit() -> None:
+    # "bitcoin" is nowhere in the corpus, so this is a new question that happens to be
+    # short — not a follow-up. Inheriting INTC here would ticker-match it past the
+    # retriever's refusal gate and answer it with confidently cited Intel articles.
+    history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
+    q = QueryAnalyzer(known_terms=KNOWN).resolve("What is the price of Bitcoin today?", history)
+    assert q.tickers == [] and q.inherited_tickers is False
+    assert q.context_keywords == []
+
+
+def test_pronoun_inherits_even_with_an_out_of_corpus_word() -> None:
+    # The vocabulary check guards only the length rule. An explicit "it" is a direct
+    # reference to the previous turn, so the regex case wins regardless.
+    history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
+    q = QueryAnalyzer(known_terms=KNOWN).resolve("Did it beat Bitcoin?", history)
+    assert q.tickers == ["INTC"] and q.inherited_tickers is True
+
+
+def test_without_known_terms_short_questions_inherit_on_length_alone() -> None:
+    # known_terms=None is the no-vocabulary mode: there is nothing to check a keyword
+    # against, so length alone decides, as it did before the vocabulary check existed.
+    history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
+    q = QueryAnalyzer().resolve("What is the price of Bitcoin today?", history)
+    assert q.tickers == ["INTC"] and q.inherited_tickers is True
