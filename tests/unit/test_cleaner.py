@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -111,6 +112,30 @@ def test_idempotent() -> None:
 def test_unknown_rule_name() -> None:
     with pytest.raises(KeyError):
         rule_named("nope")
+
+
+def test_syndication_footer_starts_at_sentence_boundary() -> None:
+    rule = rule_named("syndication_footer")
+    body = (
+        "First sentence. Second one here. Some Title Words originally appeared on "
+        "Benzinga.com View Comments"
+    )
+    assert apply_rule(body, rule).strip() == "First sentence. Second one here."
+    # No preceding sentence terminator: the rule must not match starting mid-sentence.
+    assert apply_rule("Report originally appeared on X", rule).strip() == ""
+
+
+def test_real_corpus_cleans_fast(data_path: Path) -> None:
+    # Pre-fix, syndication_footer's `\s*[^.!?]*` retried from every character position,
+    # costing 3.36s of ~4.5s total to clean these 138 bodies. Anchoring it to sentence
+    # boundaries made it linear; this guards against the quadratic behaviour regressing.
+    payload = json.loads(data_path.read_text(encoding="utf-8"))
+    records = [a for arts in payload.values() for a in arts]
+    start = time.perf_counter()
+    for record in records:
+        clean(record["full_text"], title=record["title"])
+    elapsed = time.perf_counter() - start
+    assert elapsed < 1.5, f"cleaning {len(records)} bodies took {elapsed:.2f}s"
 
 
 @pytest.fixture(scope="module")

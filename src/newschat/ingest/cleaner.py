@@ -53,7 +53,11 @@ RULES: tuple[Rule, ...] = (
     ),
     _rule(
         "syndication_footer",
-        r"\s*[^.!?]*\b(?:was originally published by|originally appeared (?:on|in))\b.*$",
+        # `(?<![^.!?])` anchors the match to start only at a sentence boundary (start-of-string
+        # or right after a `.`, `!`, or `?`) instead of retrying `[^.!?]*` from every character,
+        # which made this rule quadratic on long bodies (see test_real_corpus_cleans_fast).
+        r"(?<![^.!?])\s*[^.!?]*\b(?:was originally published by"
+        r"|originally appeared (?:on|in))\b.*$",
     ),
     _rule("view_comments_tail", r"\s*(?:Continue Reading\s*)?View Comments\s*$"),
     # ---- inner blocks, span-bounded ----
