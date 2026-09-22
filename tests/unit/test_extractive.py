@@ -185,3 +185,17 @@ def test_no_golden_question_yields_a_truncated_bullet(corpus: Corpus) -> None:
             if not sentence.endswith(terminators):
                 offenders.append(f"{case.id}: {sentence!r}")
     assert offenders == []
+
+
+S_ADVICE = "Should you buy Intel stock hand over fist before Feb. 19 and not a day later?"
+
+
+def test_advice_is_down_ranked_below_event_with_equal_overlap() -> None:
+    # Both sentences mention Intel once, so overlap alone ties them; only the advice
+    # penalty separates them. An answer that opens with "Should you buy…" reads as a
+    # recommendation no matter what the advisory footer says.
+    hits = [hit(0, [S_ADVICE]), hit(1, [S_EVENT], 1.0)]
+    ans = ExtractiveSummarizer(INFO).summarize(Q, hits, [])
+    bullets = [line for line in ans.text.splitlines() if line.startswith("- ")]
+    assert bullets[0].endswith("[2]") and S_EVENT in bullets[0]
+    assert S_ADVICE not in bullets[0]

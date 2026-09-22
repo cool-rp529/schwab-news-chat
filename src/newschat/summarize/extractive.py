@@ -25,7 +25,9 @@ class ExtractiveConfig:
     rank_bonus: float = 0.15
     lead_bonus: float = 0.05
     promo_penalty: float = 0.5
-    advice_penalty: float = 0.7
+    # 0.2, not 0.7: at 0.7 an advice-shaped headline sentence ("Should you buy X stock hand
+    # over fist before Feb. 19?") still out-scored the event sentences and led the answer.
+    advice_penalty: float = 0.2
 
 
 @dataclass(frozen=True)
