@@ -1,0 +1,141 @@
+"""Rank articles for a resolved query and decide when to refuse.
+
+Scoring: BM25 over (title x2 + body) -> x ticker boost -> x truncation penalty.
+Refusal: relative filtering alone can never refuse (the top hit is 1.0 by construction), so an
+absolute gate runs first: raw BM25 >= `min_absolute_score` and idf-weighted keyword coverage >=
+`min_coverage`, unless the article ticker-matches the query.
+"""
+
+import re
+from dataclasses import dataclass
+
+from newschat.ingest.corpus import Corpus
+from newschat.models import Hit, ResolvedQuery
+from newschat.retrieval.aliases import mentions
+from newschat.retrieval.bm25 import BM25Index
+from newschat.text.sentences import is_prose, split_sentences
+from newschat.text.tokenize import tokenize
+
+# Scraped Yahoo articles carry a relative-age stamp ("3 hours ago") next to carousel/related
+# links. `is_prose` (T4) filters short label lines but a longer prose sentence can still end
+# up quoting one ("...bullish thirty days ago..."), so the retriever excludes any sentence
+# mentioning "ago" from passage selection rather than risk citing a stamp as a fact.
+_RELATIVE_TIME_RE = re.compile(r"\bago\b", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class RetrieverConfig:
+    k: int = 5
+    ticker_boost: float = 1.5
+    truncated_penalty: float = 0.5
+    context_weight: float = 0.5
+    # measured 2026-09-22 by scripts/measure_gate.py: negatives' best row maxed at
+    # raw=7.35 cov=0.31 ("Who won the Super Bowl?") once blocked on coverage, and at
+    # raw=5.76 cov=0.59 ("best pizza in Chicago", after stemming "best" out as a query
+    # stopword) once blocked on raw instead; positives' worst row was
+    # raw=6.77 cov=0.55 ("How is DeepSeek affecting AI stocks?"). 6.2/0.45 clears every
+    # negative on at least one axis with margin >= 0.10, and clears every positive on
+    # both axes with margin >= 0.10.
+    min_absolute_score: float = 6.2
+    min_coverage: float = 0.45
+    min_relative_score: float = 0.2
+    passages_per_hit: int = 3
+
+
+@dataclass(frozen=True)
+class _Candidate:
+    score: float
+    raw: float
+    matched: int
+    ticker_match: bool
+    index: int
+
+
+class Retriever:
+    def __init__(self, corpus: Corpus, config: RetrieverConfig | None = None) -> None:
+        self.corpus = corpus
+        self.config = config or RetrieverConfig()
+        self.index = BM25Index([tokenize(a.title) * 2 + tokenize(a.text) for a in corpus.articles])
+        self._sentences = [
+            [s for s in split_sentences(a.text) if is_prose(s) and not _RELATIVE_TIME_RE.search(s)]
+            for a in corpus.articles
+        ]
+
+    def search(self, q: ResolvedQuery, k: int | None = None) -> list[Hit]:
+        k = k or self.config.k
+        own = list(dict.fromkeys(q.keywords))
+        ctx = [t for t in dict.fromkeys(q.context_keywords) if t not in own]
+        if not own and not ctx:
+            return []
+        weights = {t: 1.0 for t in own} | {t: self.config.context_weight for t in ctx}
+        raw_scores = self.index.score(own + ctx, weights)
+        total_idf = sum(self.index.idf(t) for t in own)
+        wanted = set(q.tickers)
+
+        candidates: list[_Candidate] = []
+        for i, article in enumerate(self.corpus.articles):
+            raw = raw_scores[i]
+            if raw <= 0:
+                continue
+            matched_own = [t for t in own if self.index.contains(i, t)]
+            matched = len(matched_own) + sum(self.index.contains(i, t) for t in ctx)
+            if matched == 0:
+                continue
+            ticker_match = bool(wanted) and (
+                bool(wanted & set(article.tickers))
+                or any(mentions(article.text, t) for t in wanted)
+            )
+            if not ticker_match:
+                coverage = (
+                    sum(self.index.idf(t) for t in matched_own) / total_idf if total_idf else 0.0
+                )
+                if raw < self.config.min_absolute_score or coverage < self.config.min_coverage:
+                    continue
+            score = raw
+            score *= self.config.ticker_boost if ticker_match else 1.0
+            score *= self.config.truncated_penalty if article.is_truncated else 1.0
+            candidates.append(_Candidate(score, raw, matched, ticker_match, i))
+
+        candidates.sort(key=lambda c: (-c.score, c.index))
+        if wanted:
+            restricted = [c for c in candidates if c.ticker_match]
+            top_up = [c for c in candidates if not c.ticker_match]
+            chosen = (restricted + top_up)[:k]
+        else:
+            chosen = candidates[:k]
+        if not chosen:
+            return []
+
+        top = max(c.score for c in chosen)
+        hits: list[Hit] = []
+        for c in chosen:
+            relative = c.score / top
+            if relative < self.config.min_relative_score:
+                continue
+            hits.append(
+                Hit(
+                    article=self.corpus.articles[c.index],
+                    score=round(relative, 4),
+                    raw_score=round(c.raw, 4),
+                    matched=c.matched,
+                    passages=self.select_passages(c.index, q),
+                )
+            )
+        return hits
+
+    def select_passages(self, article_index: int, q: ResolvedQuery) -> list[str]:
+        weights = {t: 1.0 for t in q.keywords} | {
+            t: self.config.context_weight for t in q.context_keywords if t not in q.keywords
+        }
+        sentences = self._sentences[article_index]
+        scored: list[tuple[float, int, str]] = []
+        for position, sentence in enumerate(sentences):
+            tokens = set(tokenize(sentence))
+            overlap = sum(w for t, w in weights.items() if t in tokens)
+            if overlap > 0:
+                scored.append((-overlap, position, sentence))
+        scored.sort()
+        chosen = [s for _, _, s in scored[: self.config.passages_per_hit]]
+        if not chosen and sentences:
+            chosen = [sentences[0]]
+        return chosen

@@ -29,6 +29,12 @@ def test_query_stopwords_are_stemmed_forms() -> None:
     assert {"happen", "stock", "company", "news", "latest"} <= QUERY_STOPWORDS
 
 
+def test_best_is_a_stopword() -> None:
+    # "best" is generic ("best pizza", "best price") and, unstemmed, carried an
+    # out-of-corpus negative ("best pizza in Chicago") through the retriever's coverage gate.
+    assert "best" in QUERY_STOPWORDS
+
+
 def test_follow_up_inherits_tickers_and_keywords() -> None:
     history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
     q = QueryAnalyzer().resolve("Who wants to buy it?", history)

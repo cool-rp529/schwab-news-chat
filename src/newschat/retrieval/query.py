@@ -20,7 +20,7 @@ _QUERY_STOPWORDS_RAW = """
     news latest recent recently update updates happening happen happened going anything
     something everything stock stocks share shares company companies market markets today
     week month year currently right now please think thoughts mean means like
-    need new
+    need new best
     """
 QUERY_STOPWORDS: frozenset[str] = frozenset(stem(w) for w in _QUERY_STOPWORDS_RAW.split())
 
