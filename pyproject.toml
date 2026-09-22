@@ -37,6 +37,11 @@ addopts = "-q"
 markers = [
   "llm: exercises the Claude CLI; skipped unless NEWSCHAT_RUN_LLM_TESTS=1 and claude is on PATH",
 ]
+filterwarnings = [
+  # Third-party deprecations from starlette's TestClient shim; not actionable in this project.
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+  "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100
