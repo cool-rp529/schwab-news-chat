@@ -82,6 +82,13 @@ RULES: tuple[Rule, ...] = (
         r" the stocks that hedge funds pile into\??.{0,600}?"
         r"\(see more details here\)\.?",
     ),
+    # Zacks' mid-article call to action. The corpus carries "#1 Rank (Strong Buy)", "#1 (Strong
+    # Buy) Rank" and bare "#1 Rank" spellings, with straight and curly apostrophes.
+    _rule(
+        "zacks_cta",
+        r"\s*You can see the complete list of today['’]s Zacks #1"
+        r" (?:Rank )?(?:\(Strong Buy\) )?(?:Rank )?stocks here\.?",
+    ),
     _rule(
         "read_also",
         r"\s*READ ALSO:.{0,400}?(?:\.(?=\s|$)|(?=\s" + _SENTENCE_START + r"\s+\w+\s+[a-z]))",

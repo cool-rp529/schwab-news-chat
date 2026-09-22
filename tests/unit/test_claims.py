@@ -35,6 +35,20 @@ def test_promo_beats_opinion_when_both_match() -> None:
     assert rule is not None and rule.kind == "promo"
 
 
+@pytest.mark.parametrize(
+    "passage",
+    [
+        "You can see the complete list of today's Zacks #1 Rank (Strong Buy) stocks here.",
+        "You can see the complete list of today’s Zacks #1 Rank stocks here.",
+        "See the Zacks #1 Rank (Strong Buy) stocks here.",
+    ],
+)
+def test_zacks_list_cta_is_promo_not_opinion(passage: str) -> None:
+    # "Zacks #1 Rank (Strong Buy)" also trips the opinion rating rule; promo must win.
+    rule = matching_rule(passage)
+    assert rule is not None and rule.name == "promo_zacks_list_cta" and rule.kind == "promo"
+
+
 def test_title_participates() -> None:
     assert (
         classify(

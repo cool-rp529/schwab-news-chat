@@ -47,6 +47,11 @@ CLAIM_RULES: tuple[ClaimRule, ...] = (
         r"|\bsee (?:more details|stocks free)\b|\blearn more\b",
     ),
     _rule(
+        "promo_zacks_list_cta",
+        "promo",
+        r"\bcomplete list of today['’]s zacks\b|\bzacks #1 rank .{0,40}?stocks here\b",
+    ),
+    _rule(
         "promo_hedge_fund_hook",
         "promo",
         r"\bhedge fund (?:investor letters|holders)\b|\bnumber of hedge fund\b",

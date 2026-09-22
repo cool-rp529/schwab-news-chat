@@ -165,6 +165,23 @@ def test_motley_fool_promo_matches_curly_apostrophe() -> None:
         assert apply_rule(body, rule).strip() == "Apple had a strong quarter."
 
 
+@pytest.mark.parametrize(
+    "cta",
+    [
+        "You can see the complete list of today’s Zacks #1 Rank (Strong Buy) stocks here.",
+        "You can see the complete list of today's Zacks #1 Rank (Strong Buy) stocks here.",
+        "You can see the complete list of today's Zacks #1 (Strong Buy) Rank stocks here.",
+        "You can see the complete list of today’s Zacks #1 Rank stocks here",
+    ],
+)
+def test_zacks_cta_removed(cta: str) -> None:
+    rule = rule_named("zacks_cta")
+    body = f"Intel carries a Zacks Rank #3 (Hold). {cta} Shares closed higher."
+    # The rule leaves a single space behind; whitespace_final collapses the double space.
+    cleaned = " ".join(apply_rule(body, rule).split())
+    assert cleaned == "Intel carries a Zacks Rank #3 (Hold). Shares closed higher."
+
+
 def test_nbsp_and_whitespace_normalised() -> None:
     assert clean("a b   c\n\nd").text == "a b c d"
     # The corpus carries NBSPs ("Vote Against\u00a0Unionizing"); \s is Unicode-aware.
@@ -234,6 +251,7 @@ def cleaned_bodies(data_path: Path) -> list[str]:
         "originally appeared",
         "Want the latest recommendations from Zacks",
         "Free Stock Analysis Report",
+        "complete list of today",
     ],
 )
 def test_real_corpus_has_no_boilerplate_marker_left(cleaned_bodies: list[str], marker: str) -> None:
