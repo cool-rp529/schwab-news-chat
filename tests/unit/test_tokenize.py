@@ -13,7 +13,8 @@ def test_keeps_dollar_tickers_and_decimals() -> None:
 
 def test_possessives_are_stripped() -> None:
     assert tokenize("Apple's iPhone") == ["apple", "iphone"]
-    assert tokenize("Apple's iPhone") == ["apple", "iphone"]
+    assert tokenize("Apple’s iPhone") == ["apple", "iphone"]
+    assert tokenize("We’ve seen the report") == ["seen", "report"]
 
 
 @pytest.mark.parametrize(

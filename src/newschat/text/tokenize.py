@@ -140,7 +140,7 @@ STOPWORDS: frozenset[str] = frozenset(
 _NO_STEM = frozenset({"news", "business", "analysis", "series", "sales", "class", "loss", "plus"})
 
 _TOKEN_RE = re.compile(r"\$?[a-z0-9]+(?:\.[0-9]+)?")
-_CLITIC_RE = re.compile(r"[''`](?:s|d|ll|re|ve|m)\b")
+_CLITIC_RE = re.compile(r"[’'`](?:s|d|ll|re|ve|m)\b")
 
 
 def stem(token: str) -> str:

@@ -26,8 +26,8 @@ def test_decimals_and_currency_do_not_split() -> None:
 
 
 def test_closing_quotes_stay_with_sentence() -> None:
-    text = 'He said "we are done." Then he left.'
-    assert split_sentences(text) == ['He said "we are done."', "Then he left."]
+    text = "He said “we are done.” Then he left."
+    assert split_sentences(text) == ["He said “we are done.”", "Then he left."]
 
 
 def test_empty_and_whitespace() -> None:
