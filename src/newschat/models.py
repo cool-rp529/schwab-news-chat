@@ -50,6 +50,9 @@ class ResolvedQuery(BaseModel):
     context_keywords: list[str] = Field(default_factory=list)
     inherited_tickers: bool = False  # true for both strong and soft inheritance
     inheritance: Inheritance = "none"
+    # A reference word ("it", "the company") with no earlier company in the thread to point
+    # at; the chat service asks which company is meant instead of searching.
+    unresolved_reference: bool = False
 
     @computed_field  # type: ignore[prop-decorator]
     @property

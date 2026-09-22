@@ -169,3 +169,52 @@ def test_new_topic_is_acknowledged_and_ends_the_thread(service: ChatService) -> 
     ans = service.ask(sid, "And the price target?")
     assert ans.query.inheritance == "none" and ans.query.tickers == []
     assert ans.query.context_keywords == []
+
+
+# ---- small talk and unresolved references ----
+
+
+@pytest.mark.parametrize(
+    ("question", "phrase"),
+    [
+        ("hello", "Hello. Ask about AAPL, AMZN"),
+        ("thanks", "You're welcome."),
+        ("What is your name?", "I summarise the news set on AAPL"),
+    ],
+)
+def test_small_talk_gets_a_plain_reply(service: ChatService, question: str, phrase: str) -> None:
+    ans = service.ask(SessionStore.new_id(), question)
+    assert ans.covered is False and ans.citations == [] and phrase in ans.text
+    assert ans.backend == service.backend and ans.query.tickers == []
+    assert ans.text.endswith(ADVISORY)
+
+
+def test_small_talk_does_not_break_the_thread(service: ChatService) -> None:
+    sid = SessionStore.new_id()
+    service.ask(sid, "What's going on with Intel?")
+    service.ask(sid, "thanks")
+    ans = service.ask(sid, "Who might buy it?")
+    assert ans.query.inheritance == "strong" and ans.query.tickers == ["INTC"]
+
+
+def test_greeting_with_a_question_is_answered_as_news(service: ChatService) -> None:
+    ans = service.ask(SessionStore.new_id(), "Hello, what's going on with Nvidia?")
+    assert ans.covered and ans.citations and "NVDA" in ans.query.tickers
+
+
+def test_pronoun_at_session_start_asks_which_company(service: ChatService) -> None:
+    ans = service.ask(SessionStore.new_id(), "Who might buy it?")
+    assert ans.covered is False and ans.citations == []
+    assert "Which company do you mean? I can answer about AAPL, AMZN" in ans.text
+    assert ans.query.unresolved_reference and ans.query.tickers == []
+
+
+def test_pronoun_after_new_topic_asks_which_company(service: ChatService) -> None:
+    sid = SessionStore.new_id()
+    service.ask(sid, "What's going on with Intel?")
+    service.ask(sid, "new topic")
+    ans = service.ask(sid, "Who might buy it?")
+    assert ans.citations == [] and "Which company do you mean?" in ans.text
+    # The clarification turn has no tickers, so naming a company afterwards starts afresh.
+    after = service.ask(sid, "What about Nvidia?")
+    assert after.query.tickers == ["NVDA"] and after.query.inheritance == "none"

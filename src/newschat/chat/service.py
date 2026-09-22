@@ -1,16 +1,24 @@
-"""Orchestration: resolve → retrieve → summarize (with fallback) → record the turn."""
+"""Orchestration: small talk → resolve → retrieve → summarize (with fallback) → record the turn.
+
+Small talk and a reference with nothing to refer to are answered without retrieval, and their
+turns carry no tickers, so neither can become the antecedent of a later "it".
+"""
 
 import logging
+from collections import deque
 
+from newschat.chat import smalltalk
 from newschat.chat.session import SessionStore
 from newschat.ingest.corpus import Corpus
-from newschat.models import Answer, ChatTurn
+from newschat.models import Answer, ChatTurn, ResolvedQuery
 from newschat.retrieval.query import QueryAnalyzer, is_reset
 from newschat.retrieval.retriever import Retriever
 from newschat.summarize.base import (
     CorpusInfo,
     Summarizer,
     SummarizerUnavailable,
+    clarification_text,
+    envelope,
     new_topic_answer,
 )
 from newschat.summarize.extractive import ExtractiveSummarizer
@@ -60,7 +68,13 @@ class ChatService:
             raise ValueError(f"question must be at most {self.max_question_chars} characters")
 
         history = self.sessions.get(session_id)
+        intent = smalltalk.detect(text)
+        if intent is not None:
+            body = smalltalk.reply(intent, self.info)
+            return self._direct(history, text, ResolvedQuery(text=text), body)
         resolved = self.analyzer.resolve(text, history)
+        if resolved.unresolved_reference:
+            return self._direct(history, text, resolved, clarification_text(self.info))
         if is_reset(text) and not resolved.keywords and not resolved.tickers:
             # A bare "new topic": acknowledge it rather than searching for nothing.
             answer = new_topic_answer(resolved, self.primary.name, self.info)
@@ -75,5 +89,20 @@ class ChatService:
             )
             answer = self.fallback.summarize(resolved, hits, list(history))
             answer = answer.model_copy(update={"backend": f"extractive (fallback: {exc.reason})"})
+        history.append(ChatTurn(question=text, answer=answer))
+        return answer
+
+    def _direct(
+        self, history: deque[ChatTurn], text: str, query: ResolvedQuery, body: str
+    ) -> Answer:
+        """Answer without retrieval (no citations, not covered) and record the turn."""
+        answer = envelope(
+            body=body,
+            citations=[],
+            backend=self.primary.name,
+            query=query,
+            covered=False,
+            info=self.info,
+        )
         history.append(ChatTurn(question=text, answer=answer))
         return answer

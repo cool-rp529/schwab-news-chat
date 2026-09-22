@@ -81,6 +81,15 @@ never carry an out-of-corpus question past the refusal gate. More transcripts,
 including four captured against the Claude CLI backend, are committed in
 [`examples/transcripts.md`](examples/transcripts.md).
 
+Conversational turns that are not news questions are handled before retrieval.
+Greetings, thanks, goodbyes, "who are you" and "what can you do" get a short,
+citation-free reply (the last two describe the covered tickers and period)
+instead of being searched for as keywords. A question whose reference word has
+nothing to point at — "Who might buy it?" as the first question, or right
+after "new topic" — gets `Which company do you mean?` rather than an answer
+about whichever articles mention "buy". Neither kind of turn carries a ticker,
+so neither can become the antecedent of a later "it".
+
 ## The data, and what it forced
 
 `stock_news.json` is a dict keyed by ticker, each entry a list of articles
@@ -144,6 +153,7 @@ schwab-news-chat/
 │   │   └── factory.py         # backend selection (explicit opt-in)
 │   ├── chat/
 │   │   ├── session.py         # SessionStore (in-memory, bounded history)
+│   │   ├── smalltalk.py       # greetings/thanks/help intents answered without retrieval
 │   │   └── service.py         # ChatService.ask(): orchestration + fallback policy
 │   ├── api/
 │   │   ├── app.py             # FastAPI routes, static mount, startup wiring

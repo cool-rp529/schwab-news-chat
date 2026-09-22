@@ -116,6 +116,10 @@ def new_topic_answer(query: ResolvedQuery, backend: str, info: CorpusInfo) -> An
     )
 
 
+def clarification_text(info: CorpusInfo) -> str:
+    return f"Which company do you mean? I can answer about {', '.join(info.tickers)}."
+
+
 def not_covered_answer(query: ResolvedQuery, backend: str, info: CorpusInfo) -> Answer:
     return envelope(
         body=not_covered_text(info),

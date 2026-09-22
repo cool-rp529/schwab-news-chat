@@ -212,3 +212,30 @@ def test_reset_turn_ends_the_thread() -> None:
     ]
     q = QueryAnalyzer(known_terms=KNOWN).resolve("Who wants to buy it?", history)
     assert q.inheritance == "none" and q.tickers == [] and q.context_keywords == []
+
+
+def test_pronoun_without_antecedent_is_flagged_unresolved() -> None:
+    q = QueryAnalyzer().resolve("Who might buy it?", [])
+    assert q.unresolved_reference is True
+    assert q.inheritance == "none" and q.tickers == [] and q.inherited_tickers is False
+
+
+def test_pronoun_after_reset_is_flagged_unresolved() -> None:
+    history = [
+        turn("What's going on with Intel?", ["INTC"], ["intel"]),
+        turn("new topic", [], []),
+    ]
+    q = QueryAnalyzer().resolve("Who might buy it?", history)
+    assert q.unresolved_reference is True and q.tickers == []
+
+
+def test_pronoun_with_antecedent_is_not_flagged() -> None:
+    history = [turn("What's going on with Intel?", ["INTC"], ["intel"])]
+    q = QueryAnalyzer().resolve("Who might buy it?", history)
+    assert q.unresolved_reference is False
+    assert q.inheritance == "strong" and q.tickers == ["INTC"]
+
+
+def test_short_question_without_antecedent_is_not_flagged() -> None:
+    # Soft follow-ups with nothing to inherit are ordinary new questions, not unresolved ones.
+    assert QueryAnalyzer().resolve("DeepSeek", []).unresolved_reference is False

@@ -17,6 +17,10 @@ Inheritance comes in two strengths:
 
 A short question containing a word the corpus has never seen is about something else and does
 not inherit at all: inheriting a ticker into it would smuggle it past the refusal gate.
+
+A reference word with nothing to refer to ("Who might buy it?" as the first question, or right
+after "new topic") inherits nothing and is flagged `unresolved_reference`, so the chat service
+asks which company is meant instead of searching for "buy" across the whole corpus.
 """
 
 import re
@@ -80,6 +84,7 @@ class QueryAnalyzer:
         )
         context: list[str] = []
         inheritance: Inheritance = "none"
+        unresolved = False
         strength: Inheritance = (
             "none" if tickers else self._follow_up_strength(text, tokens, keywords)
         )
@@ -90,6 +95,8 @@ class QueryAnalyzer:
                 inheritance = strength
                 topic = dict.fromkeys([*prior.keywords, *prior.context_keywords])
                 context = [k for k in topic if k not in keywords][: self.max_context_keywords]
+            elif strength == "strong":
+                unresolved = True
         return ResolvedQuery(
             text=text,
             tickers=tickers,
@@ -97,6 +104,7 @@ class QueryAnalyzer:
             context_keywords=context,
             inherited_tickers=inheritance != "none",
             inheritance=inheritance,
+            unresolved_reference=unresolved,
         )
 
     def is_anaphoric(self, question: str, tokens: Sequence[str]) -> bool:
