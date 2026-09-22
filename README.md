@@ -84,11 +84,12 @@ including four captured against the Claude CLI backend, are committed in
 Conversational turns that are not news questions are handled before retrieval.
 Greetings, thanks, goodbyes, "who are you" and "what can you do" get a short,
 citation-free reply (the last two describe the covered tickers and period)
-instead of being searched for as keywords. A question whose reference word has
-nothing to point at — "Who might buy it?" as the first question, or right
-after "new topic" — gets `Which company do you mean?` rather than an answer
-about whichever articles mention "buy". Neither kind of turn carries a ticker,
-so neither can become the antecedent of a later "it". Input is
+instead of being searched for as keywords. When a pronoun has no antecedent
+and the question names no specific topic — "Who might buy it?" as the first
+question, or right after "new topic" — the reply is `Which company do you
+mean?` rather than an answer about whichever articles mention "buy"; "What is
+this DeepSeek thing?" is searched as usual. Neither kind of turn carries a
+ticker, so neither can become the antecedent of a later "it". Input is
 NFKC-normalised, so fullwidth "Ｉｎｔｅｌ" reads as "Intel", and a cashtag such as
 `$INTC` is searched as the plain ticker `intc`.
 

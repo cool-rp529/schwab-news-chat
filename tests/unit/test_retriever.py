@@ -215,6 +215,14 @@ def test_known_terms_is_the_real_corpus_vocabulary(real: Retriever) -> None:
     assert "bitcoin" not in real.known_terms
 
 
+def test_specific_terms_are_those_in_at_most_ten_percent_of_articles(real: Retriever) -> None:
+    limit = 11  # floor(0.10 * 118)
+    assert real.index.n_docs == 118
+    assert real.specific_terms == real.index.terms_with_df_at_most(limit)
+    assert {"deepseek", "alibaba"} <= real.specific_terms
+    assert not {"buy", "deal", "might"} & real.specific_terms
+
+
 # ---- inheritance strength: soft tickers are a ranking preference, strong ones restrict ----
 
 

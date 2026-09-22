@@ -193,7 +193,9 @@ def _tier_report(tier: str, results: Sequence[CaseResult]) -> TierReport:
 
 def evaluate(cases: Sequence[GoldenCase], corpus: Corpus, k: int = 5) -> EvalReport:
     retriever = Retriever(corpus)
-    analyzer = QueryAnalyzer(known_terms=retriever.known_terms)
+    analyzer = QueryAnalyzer(
+        known_terms=retriever.known_terms, specific_terms=retriever.specific_terms
+    )
     summarizer = ExtractiveSummarizer(CorpusInfo(corpus.infer_period(), tuple(corpus.tickers)))
     by_tier: dict[str, list[CaseResult]] = {}
     for case in cases:

@@ -228,3 +228,29 @@ def test_cashtag_question_is_answered(service: ChatService) -> None:
 def test_fullwidth_question_is_answered(service: ChatService) -> None:
     ans = service.ask(SessionStore.new_id(), "Ｉｎｔｅｌ ｎｅｗｓ")
     assert ans.covered and ans.citations and ans.query.tickers == ["INTC"]
+
+
+@pytest.mark.parametrize(
+    "question", ["What is this DeepSeek thing?", "Tell me about that Alibaba deal"]
+)
+def test_pronoun_question_with_a_specific_topic_is_searched(
+    service: ChatService, question: str
+) -> None:
+    ans = service.ask(SessionStore.new_id(), question)
+    assert ans.covered and ans.citations and not ans.query.unresolved_reference
+    assert "Which company do you mean?" not in ans.text
+
+
+def test_deepseek_question_cites_deepseek_articles(service: ChatService, corpus: Corpus) -> None:
+    ans = service.ask(SessionStore.new_id(), "What is this DeepSeek thing?")
+    texts = {a.id: f"{a.title} {a.text}".lower() for a in corpus.articles}
+    assert all("deepseek" in texts[c.article_id] for c in ans.citations)
+
+
+@pytest.mark.parametrize("question", ["Who might buy it?", "Is that a buy?"])
+def test_pronoun_question_without_a_specific_topic_asks_which_company(
+    service: ChatService, question: str
+) -> None:
+    ans = service.ask(SessionStore.new_id(), question)
+    assert ans.covered is False and ans.citations == []
+    assert "Which company do you mean?" in ans.text and ans.query.unresolved_reference

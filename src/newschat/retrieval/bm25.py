@@ -29,6 +29,10 @@ class BM25Index:
         """The indexed vocabulary: every term that occurs in at least one document."""
         return frozenset(self._df)
 
+    def terms_with_df_at_most(self, limit: int) -> frozenset[str]:
+        """Indexed terms that occur in at most `limit` documents."""
+        return frozenset(t for t, df in self._df.items() if df <= limit)
+
     def df(self, term: str) -> int:
         return self._df.get(term, 0)
 

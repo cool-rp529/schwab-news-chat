@@ -17,6 +17,7 @@ bounded by `k1 + 1` for every query length, so the same floor means the same thi
 question is "DeepSeek" or "How is DeepSeek affecting AI stocks?".
 """
 
+import math
 from dataclasses import dataclass
 
 from newschat.ingest.corpus import Corpus
@@ -25,6 +26,9 @@ from newschat.retrieval.aliases import mentions
 from newschat.retrieval.bm25 import BM25Index
 from newschat.text.sentences import is_prose, split_sentences
 from newschat.text.tokenize import tokenize
+
+# A word in at most this share of articles is specific enough to name a topic by itself.
+SPECIFIC_DF_SHARE = 0.10
 
 
 @dataclass(frozen=True)
@@ -69,6 +73,12 @@ class Retriever:
     def known_terms(self) -> frozenset[str]:
         """The corpus vocabulary, for callers that need to spot out-of-corpus words."""
         return self.index.terms()
+
+    @property
+    def specific_terms(self) -> frozenset[str]:
+        """Terms in at most 10 % of articles (11 of 118): words that name a topic of their own,
+        unlike "buy" or "deal", which half the corpus uses."""
+        return self.index.terms_with_df_at_most(math.floor(SPECIFIC_DF_SHARE * self.index.n_docs))
 
     def search(self, q: ResolvedQuery, k: int | None = None) -> list[Hit]:
         k = k or self.config.k

@@ -224,8 +224,11 @@ def test_prices_keep_their_dollar_sign_and_cashtags_dedupe() -> None:
     assert q.keywords == ["intc", "$20.5"]
 
 
+SPECIFIC = frozenset({"deepseek", "alibaba"})
+
+
 def test_pronoun_without_antecedent_is_flagged_unresolved() -> None:
-    q = QueryAnalyzer().resolve("Who might buy it?", [])
+    q = QueryAnalyzer(specific_terms=SPECIFIC).resolve("Who might buy it?", [])
     assert q.unresolved_reference is True
     assert q.inheritance == "none" and q.tickers == [] and q.inherited_tickers is False
 
@@ -235,7 +238,7 @@ def test_pronoun_after_reset_is_flagged_unresolved() -> None:
         turn("What's going on with Intel?", ["INTC"], ["intel"]),
         turn("new topic", [], []),
     ]
-    q = QueryAnalyzer().resolve("Who might buy it?", history)
+    q = QueryAnalyzer(specific_terms=SPECIFIC).resolve("Who might buy it?", history)
     assert q.unresolved_reference is True and q.tickers == []
 
 
@@ -249,3 +252,15 @@ def test_pronoun_with_antecedent_is_not_flagged() -> None:
 def test_short_question_without_antecedent_is_not_flagged() -> None:
     # Soft follow-ups with nothing to inherit are ordinary new questions, not unresolved ones.
     assert QueryAnalyzer().resolve("DeepSeek", []).unresolved_reference is False
+
+
+def test_pronoun_question_naming_a_specific_topic_is_not_flagged() -> None:
+    q = QueryAnalyzer(specific_terms=SPECIFIC).resolve("What is this DeepSeek thing?", [])
+    assert q.unresolved_reference is False and q.inheritance == "none"
+    assert q.keywords == ["deepseek", "thing"]
+
+
+def test_without_specific_terms_only_a_keywordless_reference_is_unresolved() -> None:
+    analyzer = QueryAnalyzer()
+    assert analyzer.resolve("What about it?", []).unresolved_reference is True
+    assert analyzer.resolve("Who might buy it?", []).unresolved_reference is False

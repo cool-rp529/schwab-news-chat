@@ -19,8 +19,12 @@ A short question containing a word the corpus has never seen is about something 
 not inherit at all: inheriting a ticker into it would smuggle it past the refusal gate.
 
 A reference word with nothing to refer to ("Who might buy it?" as the first question, or right
-after "new topic") inherits nothing and is flagged `unresolved_reference`, so the chat service
-asks which company is meant instead of searching for "buy" across the whole corpus.
+after "new topic") inherits nothing. If the question also names no specific topic of its own —
+no word from `specific_terms`, the corpus's rarer words — it is flagged `unresolved_reference`,
+so the chat service asks which company is meant instead of searching for "buy" across the whole
+corpus. "What is this DeepSeek thing?" has "deepseek", so it is searched like any new question.
+With `specific_terms=None` there is no vocabulary to consult, and only a question with no
+keywords at all is flagged.
 """
 
 import re
@@ -71,12 +75,15 @@ class QueryAnalyzer:
         max_short_tokens: int = 4,
         known_terms: Collection[str] | None = None,
         max_context_keywords: int = 8,
+        specific_terms: Collection[str] | None = None,
     ) -> None:
         self.max_short_tokens = max_short_tokens
         # Carried context is ordered most recent turn first; the cap drops the oldest words.
         self.max_context_keywords = max_context_keywords
         # None means "no vocabulary check": short questions inherit on length alone.
         self.known_terms = known_terms
+        # None means "no rarity check": only a keyword-less reference is unresolved.
+        self.specific_terms = specific_terms
 
     def resolve(self, question: str, history: Sequence[ChatTurn]) -> ResolvedQuery:
         text = question.strip()
@@ -104,7 +111,7 @@ class QueryAnalyzer:
                 topic = dict.fromkeys([*prior.keywords, *prior.context_keywords])
                 context = [k for k in topic if k not in keywords][: self.max_context_keywords]
             elif strength == "strong":
-                unresolved = True
+                unresolved = not self._names_specific_topic(keywords)
         return ResolvedQuery(
             text=text,
             tickers=tickers,
@@ -138,6 +145,12 @@ class QueryAnalyzer:
         if self.known_terms is None:
             return True
         return all(k in self.known_terms for k in keywords)
+
+    def _names_specific_topic(self, keywords: Sequence[str]) -> bool:
+        """Whether a keyword is rare enough in the corpus to be a topic on its own."""
+        if self.specific_terms is None:
+            return bool(keywords)
+        return any(k in self.specific_terms for k in keywords)
 
     @staticmethod
     def _last_with_tickers(history: Sequence[ChatTurn]) -> ResolvedQuery | None:

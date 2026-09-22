@@ -31,6 +31,12 @@ def test_terms_is_the_indexed_vocabulary(index: BM25Index) -> None:
     assert BM25Index([]).terms() == frozenset()
 
 
+def test_terms_with_df_at_most(index: BM25Index) -> None:
+    assert index.terms_with_df_at_most(1) == index.terms() - {"intel"}
+    assert index.terms_with_df_at_most(3) == index.terms()
+    assert index.terms_with_df_at_most(0) == frozenset()
+
+
 def test_unknown_term_scores_zero_everywhere(index: BM25Index) -> None:
     assert index.score(["missing"]) == [0.0] * 4
 
