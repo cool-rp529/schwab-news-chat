@@ -58,6 +58,10 @@ class ExtractiveSummarizer:
         if not hits:
             return not_covered_answer(query, self.name, self.info)
         selected = self._select(self._candidates(query, hits))
+        # Every hit can be a truncated stub with no eligible passage; rendering "From 0
+        # articles on :" would claim coverage that no sentence backs.
+        if not selected:
+            return not_covered_answer(query, self.name, self.info)
         return envelope(
             body=self._render(hits, selected),
             citations=self._citations(hits, selected),

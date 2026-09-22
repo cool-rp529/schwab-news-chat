@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import pytest
 
+from newschat.evaluation import load_golden
 from newschat.ingest.corpus import Corpus
 from newschat.models import Article, Hit, ResolvedQuery
 from newschat.retrieval.query import QueryAnalyzer
@@ -7,6 +10,7 @@ from newschat.retrieval.retriever import Retriever
 from newschat.summarize.base import ADVISORY, CorpusInfo
 from newschat.summarize.extractive import KIND_HEADINGS, ExtractiveSummarizer, jaccard
 
+GOLDEN = Path(__file__).resolve().parents[1] / "eval" / "golden.yaml"
 INFO = CorpusInfo(period="February 2025", tickers=("INTC", "NVDA"))
 S_EVENT = (
     "Intel shares rose more than 10% on Tuesday after a report that Broadcom and TSMC are "
@@ -68,6 +72,15 @@ def test_not_covered_when_no_hits() -> None:
     ans = ExtractiveSummarizer(INFO).summarize(Q, [], [])
     assert ans.covered is False and ans.citations == [] and ans.backend == "extractive"
     assert ans.text.endswith(ADVISORY)
+
+
+def test_not_covered_when_every_hit_has_no_eligible_passage() -> None:
+    # Truncated MT Newswires stubs yield no prose sentence, so no candidate can be selected;
+    # the alternative is rendering "From 0 articles on :" as if it were an answer.
+    hits = [hit(0, []), hit(1, [], 0.8)]
+    ans = ExtractiveSummarizer(INFO).summarize(Q, hits, [])
+    assert ans.covered is False and ans.citations == []
+    assert "From 0 articles" not in ans.text and "doesn't cover that" in ans.text
 
 
 def test_every_bullet_is_verbatim_and_cited() -> None:
@@ -149,3 +162,26 @@ def test_deterministic_on_real_corpus(corpus: Corpus) -> None:
     assert a == b and a.covered and a.citations
     for c in a.citations:
         assert c.passage in corpus.by_id[c.article_id].text
+
+
+def test_no_golden_question_yields_a_truncated_bullet(corpus: Corpus) -> None:
+    """Every bullet the real corpus can produce ends in a terminator.
+
+    The MT Newswires paywall stubs are cut mid-word around 100 characters; before the
+    terminal-punctuation guard in `is_prose` they surfaced as bullets like
+    "…a benchmark of more than 1,400 free [1]".
+    """
+    terminators = (".", "!", "?", '"', "\u201d", "\u2019", ")")
+    analyzer, retriever = QueryAnalyzer(), Retriever(corpus)
+    summarizer = ExtractiveSummarizer(CorpusInfo(corpus.infer_period(), tuple(corpus.tickers)))
+    offenders: list[str] = []
+    for case in load_golden(GOLDEN).cases:
+        q = analyzer.resolve(case.question, [])
+        answer = summarizer.summarize(q, retriever.search(q), [])
+        for line in answer.text.splitlines():
+            if not line.startswith("- "):
+                continue
+            sentence = line[2:].rpartition(" [")[0]
+            if not sentence.endswith(terminators):
+                offenders.append(f"{case.id}: {sentence!r}")
+    assert offenders == []

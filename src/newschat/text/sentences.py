@@ -42,6 +42,10 @@ _DECIMAL_RE = re.compile(r"(?<=\d)\.(?=\d)")
 # Lookbehind closers: straight double quote, curly closing quote, curly apostrophe, closing paren
 _SPLIT_RE = re.compile('(?:(?<=[.!?])|(?<=[.!?]["\\u201d\\u2019)]))\\s+(?=["\\u201c(\\[\\$A-Z0-9])')
 _TIME_RE = re.compile(r"\b\d{1,2}:\d{2}\b")
+# A complete sentence ends in a terminator, optionally followed by a closing quote or paren.
+# MT Newswires paywall stubs are cut mid-word around 100 characters, so requiring one keeps
+# "…a benchmark of more than 1,400 free" out of the bullets.
+_TERMINALS = (".", "!", "?", '"', "”", "’", ")")
 
 
 def split_sentences(text: str) -> list[str]:
@@ -56,6 +60,8 @@ def is_prose(sentence: str, min_words: int = 8, max_words: int = 80) -> bool:
     if not min_words <= len(words) <= max_words:
         return False
     if "•" in sentence or _TIME_RE.search(sentence) or sentence.endswith(":"):
+        return False
+    if not sentence.endswith(_TERMINALS):
         return False
     alpha = [w for w in words if w[0].isalpha()]
     if not alpha:

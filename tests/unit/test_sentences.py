@@ -53,3 +53,21 @@ def test_is_prose_rejects_carousel_and_stamps() -> None:
     assert not is_prose("Nvidia Stock News And Analysis Nvidia Soars As Stargate Sparks More AI")
     assert not is_prose("Too short here.")
     assert not is_prose("Key Takeaways:")
+
+
+TRUNCATED_STUB = (
+    "Microsoft-backed (MSFT) OpenAI on Tuesday introduced SWE-Lancer, a benchmark of more "
+    "than 1,400 free"
+)
+
+
+def test_is_prose_rejects_mid_word_truncated_stub() -> None:
+    # MT Newswires paywall stubs are cut around 100 characters, mid-word.
+    assert not is_prose(TRUNCATED_STUB)
+    assert is_prose(TRUNCATED_STUB + ".")
+
+
+def test_is_prose_accepts_closing_quote_and_paren_terminators() -> None:
+    assert is_prose('The chief executive said the split "was never on the table."')
+    assert is_prose("The chief executive said the split was never on the table.”")
+    assert is_prose("Revenue climbed again last quarter across every reported segment.)")
