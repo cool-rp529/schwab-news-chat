@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import pytest
+
 from newschat.ingest.cleaner import clean
 from newschat.ingest.dedupe import article_id, build_articles, source_of
-from newschat.ingest.loader import RawRecord, load_records
+from newschat.ingest.loader import CorpusError, RawRecord, load_records
 
 
 def rec(
@@ -21,6 +23,13 @@ def test_article_id_is_stable_short_sha1() -> None:
 
 def test_source_strips_www() -> None:
     assert source_of("https://www.finance.yahoo.com/news/x.html") == "finance.yahoo.com"
+
+
+def test_rejects_non_http_link_scheme() -> None:
+    # Citation URLs are rendered as <a href> in the UI; a javascript: link would be a
+    # clickable script sourced from the corpus.
+    with pytest.raises(CorpusError, match="unsupported URL scheme"):
+        build_articles([rec("javascript:alert(1)", "AAPL", "Body text.")])
 
 
 def test_merges_duplicates_and_unions_tickers() -> None:

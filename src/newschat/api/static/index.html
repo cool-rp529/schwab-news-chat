@@ -70,7 +70,10 @@
     const details = el('details', 'cite');
     const summary = el('summary');
     const link = el('a', null, '[' + c.n + '] ' + c.title);
-    link.href = c.url; link.target = '_blank'; link.rel = 'noopener';
+    // Second layer: the loader already rejects non-http(s) links, but href is the one
+    // place article data becomes executable, so never assign it unvalidated.
+    link.href = /^https?:\/\//i.test(c.url) ? c.url : '#';
+    link.target = '_blank'; link.rel = 'noopener';
     summary.appendChild(link);
     summary.appendChild(el('span', null,
       ' — ' + c.tickers.join(', ') + ' · ' + c.kind + (c.verified ? '' : ' · unverified')));

@@ -15,6 +15,8 @@ def test_index_serves_html(client: TestClient) -> None:
     res = client.get("/")
     assert res.status_code == 200 and "text/html" in res.headers["content-type"]
     assert 'aria-live="polite"' in res.text and "innerHTML" not in res.text
+    # href is the one place article data becomes executable; it must be scheme-guarded.
+    assert r"/^https?:\/\//i.test(c.url)" in res.text
 
 
 def test_health(client: TestClient) -> None:

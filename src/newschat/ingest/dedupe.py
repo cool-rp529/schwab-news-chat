@@ -10,8 +10,13 @@ from collections.abc import Iterable
 from urllib.parse import urlparse
 
 from newschat.ingest.cleaner import clean
-from newschat.ingest.loader import RawRecord
+from newschat.ingest.loader import CorpusError, RawRecord
 from newschat.models import Article
+
+# The UI renders every citation as an <a href>, so a `javascript:` or `data:` link in the
+# corpus would become a clickable script. Pydantic's HttpUrl would validate this but also
+# normalise the string, which would change every article id and break equality.
+ALLOWED_SCHEMES = ("http://", "https://")
 
 
 def article_id(url: str) -> str:
@@ -29,6 +34,8 @@ def build_articles(records: Iterable[RawRecord]) -> list[Article]:
 
     articles: list[Article] = []
     for link, group in groups.items():
+        if not link.lower().startswith(ALLOWED_SCHEMES):
+            raise CorpusError(f"{link!r}: unsupported URL scheme")
         first = group[0]
         body = max(group, key=lambda r: len(r.full_text)).full_text  # ties → first occurrence
         tickers = sorted({t for r in group for t in (r.ticker, r.key_ticker)})
