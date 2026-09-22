@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>News Chat</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 1rem auto; padding: 0 1rem; }
+  #log { list-style: none; padding: 0; }
+  .msg { margin: .75rem 0; padding: .75rem; border-radius: .5rem; white-space: pre-wrap; }
+  .user { background: #eef; }
+  .assistant { background: #f4f4f4; }
+  .error { background: #fee; }
+  .meta { font-size: .8rem; color: #555; margin-top: .5rem; white-space: normal; }
+  .cite { white-space: normal; margin-top: .5rem; }
+  .cite summary { cursor: pointer; }
+  .passage { font-style: italic; margin: .25rem 0 .5rem 1rem; }
+  form { display: flex; gap: .5rem; align-items: center; }
+  input { flex: 1; padding: .5rem; }
+</style>
+</head>
+<body>
+<h1>News Chat</h1>
+<p id="intro">Ask about the news set. <span id="period"></span></p>
+<ul id="log" aria-live="polite" aria-relevant="additions"></ul>
+<form id="form">
+  <label for="q">Your question</label>
+  <input id="q" name="q" autocomplete="off" maxlength="1000" required>
+  <button id="send" type="submit">Send</button>
+</form>
+<footer><p id="footer"></p></footer>
+<script>
+(() => {
+  const log = document.getElementById('log');
+  const form = document.getElementById('form');
+  const input = document.getElementById('q');
+  const send = document.getElementById('send');
+  const SESSION_KEY = 'newschat.session';
+  let sessionId = null;
+  try { sessionId = sessionStorage.getItem(SESSION_KEY); } catch (e) { /* storage unavailable */ }
+
+  // All data goes through textContent / createElement: article text is untrusted third-party HTML-derived text.
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+  function bubble(cls, text) {
+    const li = el('li', 'msg ' + cls, text);
+    log.appendChild(li);
+    li.scrollIntoView({ block: 'end' });
+    return li;
+  }
+
+  async function loadHealth() {
+    try {
+      const h = await (await fetch('/api/health')).json();
+      document.getElementById('period').textContent =
+        'Coverage: ' + h.unique_tickers.join(', ') + ' from around ' + h.period + '.';
+      document.getElementById('footer').textContent =
+        'Corpus ≈ ' + h.period + '; articles carry no timestamps. Backend: ' + h.backend +
+        (h.sends_data_to_third_party ? ' (questions are sent to Anthropic).' : ' (fully offline).');
+    } catch (e) {
+      document.getElementById('footer').textContent = 'Could not load /api/health.';
+    }
+  }
+
+  function renderCitation(c) {
+    const details = el('details', 'cite');
+    const summary = el('summary');
+    const link = el('a', null, '[' + c.n + '] ' + c.title);
+    link.href = c.url; link.target = '_blank'; link.rel = 'noopener';
+    summary.appendChild(link);
+    summary.appendChild(el('span', null,
+      ' — ' + c.tickers.join(', ') + ' · ' + c.kind + (c.verified ? '' : ' · unverified')));
+    details.appendChild(summary);
+    details.appendChild(el('p', 'passage', c.passage || '(no passage)'));
+    details.addEventListener('toggle', async () => {
+      if (!details.open || details.dataset.loaded) return;
+      details.dataset.loaded = '1';
+      try {
+        const a = await (await fetch('/api/articles/' + encodeURIComponent(c.article_id))).json();
+        details.appendChild(el('p', 'meta',
+          a.word_count + ' words' + (a.is_truncated ? ' · truncated source' : '')));
+      } catch (e) {
+        details.appendChild(el('p', 'meta', 'Could not load article.'));
+      }
+    });
+    return details;
+  }
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const question = input.value.trim();
+    if (!question) return;
+    bubble('user', question);
+    input.value = ''; input.disabled = true; send.disabled = true;
+    const pending = bubble('assistant', 'Thinking…');
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question, session_id: sessionId }),
+      });
+      if (!res.ok) throw new Error(res.status + ': ' + (await res.text()));
+      const data = await res.json();
+      sessionId = data.session_id;
+      try { sessionStorage.setItem(SESSION_KEY, sessionId); } catch (e) { /* ignore */ }
+      const a = data.answer;
+      pending.textContent = a.text;
+      if (a.citations.length) {
+        const box = el('div');
+        a.citations.forEach((c) => box.appendChild(renderCitation(c)));
+        pending.appendChild(box);
+      }
+      pending.appendChild(el('div', 'meta', 'backend: ' + a.backend + (a.covered ? '' : ' · not covered')));
+    } catch (err) {
+      pending.className = 'msg error';
+      pending.textContent = 'Request failed — ' + err.message;
+    } finally {
+      input.disabled = false; send.disabled = false; input.focus();
+    }
+  });
+
+  loadHealth();
+  input.focus();
+})();
+</script>
+</body>
+</html>
