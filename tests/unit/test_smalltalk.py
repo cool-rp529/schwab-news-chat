@@ -25,6 +25,7 @@ from newschat.summarize.base import CorpusInfo
         ("bye", "goodbye"),
         ("Goodbye!", "goodbye"),
         ("see you", "goodbye"),
+        ("ＨＥＬＬＯ", "greeting"),
     ],
 )
 def test_detects_each_intent(text: str, intent: str) -> None:

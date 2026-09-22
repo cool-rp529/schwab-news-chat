@@ -10,6 +10,7 @@ from typing import Literal
 
 from newschat.retrieval.aliases import find_tickers
 from newschat.summarize.base import CorpusInfo
+from newschat.text.tokenize import normalize_text
 
 Intent = Literal["greeting", "thanks", "identity", "help", "goodbye"]
 
@@ -32,7 +33,7 @@ _COMPILED: dict[Intent, re.Pattern[str]] = {
 
 def detect(question: str) -> Intent | None:
     """The small-talk intent of a whole message, or None for anything that may be a question."""
-    text = question.replace("’", "'")
+    text = normalize_text(question).replace("’", "'")
     text = " ".join(re.sub(r"[,;:]", " ", text).split())
     if not text or len(text.split()) > MAX_WORDS or find_tickers(text):
         return None

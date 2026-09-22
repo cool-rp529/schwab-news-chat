@@ -171,7 +171,7 @@ def test_new_topic_is_acknowledged_and_ends_the_thread(service: ChatService) -> 
     assert ans.query.context_keywords == []
 
 
-# ---- small talk and unresolved references ----
+# ---- small talk, unresolved references, cashtags and Unicode input ----
 
 
 @pytest.mark.parametrize(
@@ -218,3 +218,13 @@ def test_pronoun_after_new_topic_asks_which_company(service: ChatService) -> Non
     # The clarification turn has no tickers, so naming a company afterwards starts afresh.
     after = service.ask(sid, "What about Nvidia?")
     assert after.query.tickers == ["NVDA"] and after.query.inheritance == "none"
+
+
+def test_cashtag_question_is_answered(service: ChatService) -> None:
+    ans = service.ask(SessionStore.new_id(), "$INTC latest")
+    assert ans.covered and ans.citations and ans.query.keywords == ["intc"]
+
+
+def test_fullwidth_question_is_answered(service: ChatService) -> None:
+    ans = service.ask(SessionStore.new_id(), "Ｉｎｔｅｌ ｎｅｗｓ")
+    assert ans.covered and ans.citations and ans.query.tickers == ["INTC"]

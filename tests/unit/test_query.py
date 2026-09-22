@@ -214,6 +214,16 @@ def test_reset_turn_ends_the_thread() -> None:
     assert q.inheritance == "none" and q.tickers == [] and q.context_keywords == []
 
 
+def test_cashtag_keyword_loses_its_dollar_sign() -> None:
+    q = QueryAnalyzer().resolve("$INTC latest", [])
+    assert q.tickers == ["INTC"] and q.keywords == ["intc"]
+
+
+def test_prices_keep_their_dollar_sign_and_cashtags_dedupe() -> None:
+    q = QueryAnalyzer().resolve("$INTC intc above $20.5", [])
+    assert q.keywords == ["intc", "$20.5"]
+
+
 def test_pronoun_without_antecedent_is_flagged_unresolved() -> None:
     q = QueryAnalyzer().resolve("Who might buy it?", [])
     assert q.unresolved_reference is True

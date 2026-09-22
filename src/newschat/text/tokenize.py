@@ -2,6 +2,7 @@
 light suffix stemming. Fully specified by tests; no third-party NLP."""
 
 import re
+import unicodedata
 
 STOPWORDS: frozenset[str] = frozenset(
     [
@@ -157,6 +158,14 @@ def stem(token: str) -> str:
     return token
 
 
+def normalize_text(text: str) -> str:
+    """NFKC-fold compatibility forms, so fullwidth letters read as their ASCII forms and a
+    ligature or superscript digit matches its plain spelling."""
+    if unicodedata.is_normalized("NFKC", text):
+        return text
+    return unicodedata.normalize("NFKC", text)
+
+
 def tokenize(text: str) -> list[str]:
-    lowered = _CLITIC_RE.sub("", text.lower())
+    lowered = _CLITIC_RE.sub("", normalize_text(text).lower())
     return [stem(t) for t in _TOKEN_RE.findall(lowered) if t not in STOPWORDS]

@@ -54,6 +54,12 @@ _RESET_RE = re.compile(r"\bnew topic\b", re.IGNORECASE)
 _RESET_TOKENS = frozenset(tokenize("new topic"))
 
 
+def _strip_dollar(token: str) -> str:
+    """Turn a cashtag like "$intc" into "intc", the index's plain token; "$1.5" stays a price."""
+    rest = token[1:]
+    return rest if token.startswith("$") and rest.isalpha() else token
+
+
 def is_reset(question: str) -> bool:
     """Whether the question contains the "new topic" phrase that ends the current thread."""
     return _RESET_RE.search(question) is not None
@@ -79,7 +85,9 @@ class QueryAnalyzer:
         reset = is_reset(text)
         keywords = list(
             dict.fromkeys(
-                t for t in tokens if t not in QUERY_STOPWORDS and not (reset and t in _RESET_TOKENS)
+                _strip_dollar(t)
+                for t in tokens
+                if t not in QUERY_STOPWORDS and not (reset and t in _RESET_TOKENS)
             )
         )
         context: list[str] = []

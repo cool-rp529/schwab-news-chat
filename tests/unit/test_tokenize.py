@@ -1,6 +1,6 @@
 import pytest
 
-from newschat.text.tokenize import STOPWORDS, stem, tokenize
+from newschat.text.tokenize import STOPWORDS, normalize_text, stem, tokenize
 
 
 def test_lowercases_and_drops_stopwords() -> None:
@@ -39,3 +39,12 @@ def test_stem(word: str, expected: str) -> None:
 
 def test_stopwords_include_question_words() -> None:
     assert {"what", "who", "how", "the", "is", "about"} <= STOPWORDS
+
+
+def test_fullwidth_text_is_nfkc_normalised() -> None:
+    assert tokenize("Ｉｎｔｅｌ") == ["intel"]
+    assert normalize_text("Ｉｎｔｅｌ ｎｅｗｓ") == "Intel news"
+
+
+def test_nfkc_leaves_curly_quotes_alone() -> None:
+    assert normalize_text("’ “ ”") == "’ “ ”"

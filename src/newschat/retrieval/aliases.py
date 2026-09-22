@@ -3,7 +3,7 @@ corpus is unreliable, so this table is how a question about "the iPhone" reaches
 
 import re
 
-from newschat.text.tokenize import tokenize
+from newschat.text.tokenize import normalize_text, tokenize
 
 ALIASES: dict[str, tuple[str, ...]] = {
     "AAPL": (
@@ -36,6 +36,7 @@ _DOLLAR_RE = re.compile(r"\$(" + _SYMBOLS + r")\b", re.IGNORECASE)
 
 
 def find_tickers(text: str) -> list[str]:
+    text = normalize_text(text)
     found = {t for t, pattern in _ALIAS_PATTERNS.items() if pattern.search(text)}
     found.update(m.group(1).upper() for m in _BARE_RE.finditer(text))
     found.update(m.group(1).upper() for m in _DOLLAR_RE.finditer(text))
@@ -43,6 +44,7 @@ def find_tickers(text: str) -> list[str]:
 
 
 def mentions(text: str, ticker: str) -> bool:
+    text = normalize_text(text)
     if _ALIAS_PATTERNS[ticker].search(text):
         return True
     return re.search(r"(?<![A-Za-z])" + ticker + r"\b", text) is not None

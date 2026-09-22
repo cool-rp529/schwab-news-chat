@@ -88,7 +88,9 @@ instead of being searched for as keywords. A question whose reference word has
 nothing to point at — "Who might buy it?" as the first question, or right
 after "new topic" — gets `Which company do you mean?` rather than an answer
 about whichever articles mention "buy". Neither kind of turn carries a ticker,
-so neither can become the antecedent of a later "it".
+so neither can become the antecedent of a later "it". Input is
+NFKC-normalised, so fullwidth "Ｉｎｔｅｌ" reads as "Intel", and a cashtag such as
+`$INTC` is searched as the plain ticker `intc`.
 
 ## The data, and what it forced
 

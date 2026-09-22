@@ -39,3 +39,8 @@ def test_mentions_is_whole_word() -> None:
 def test_alias_tokens_are_stemmed_lowercase() -> None:
     toks = alias_tokens()
     assert {"apple", "iphone", "nvidia", "intel", "ibm", "netflix", "amazon", "aws"} <= toks
+
+
+def test_fullwidth_names_are_found() -> None:
+    assert find_tickers("Ｉｎｔｅｌ ｎｅｗｓ") == ["INTC"]
+    assert mentions("Ｉｎｔｅｌ stock rose", "INTC")
