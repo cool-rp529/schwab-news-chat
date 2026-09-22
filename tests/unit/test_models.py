@@ -29,6 +29,23 @@ def test_hit_requires_passages_list() -> None:
     assert hit.passages == ["a"]
 
 
+@pytest.mark.parametrize(
+    ("score", "raw_score"),
+    [(1.5, 7.2), (-0.1, 7.2), (1.0, -0.1)],
+)
+def test_hit_score_bounds_are_enforced(score: float, raw_score: float) -> None:
+    # `score` is a ratio to the top hit and `raw_score` an unboosted BM25 total; a value
+    # outside those ranges means a scoring bug, and should not reach a citation.
+    with pytest.raises(ValidationError):
+        Hit(
+            article=make_article(),
+            score=score,
+            raw_score=raw_score,
+            matched=1,
+            passages=[],
+        )
+
+
 def test_citation_defaults_to_verified_event() -> None:
     cit = Citation(n=1, article_id="x", title="t", url="u", tickers=[], passage="p")
     assert cit.verified is True

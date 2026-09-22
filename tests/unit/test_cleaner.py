@@ -95,8 +95,60 @@ def test_single_rule_can_be_applied_in_isolation() -> None:
     )
 
 
+def test_zacks_free_report_tail_removed() -> None:
+    rule = rule_named("zacks_free_report")
+    body = (
+        "Intel closed lower on Tuesday. Click to get this free report Intel Corporation "
+        "(INTC) : Free Stock Analysis Report"
+    )
+    assert apply_rule(body, rule).strip() == "Intel closed lower on Tuesday."
+
+
+def test_insider_monkey_footer_tail_removed() -> None:
+    rule = rule_named("insider_monkey_footer")
+    body = (
+        "Nvidia led the group. READ NEXT: 20 Best AI Stocks To Buy Now. Disclosure: None. "
+        "This article is originally published at Insider Monkey."
+    )
+    assert apply_rule(body, rule).strip() == "Nvidia led the group."
+
+
+def test_simply_wall_st_footer_tail_removed() -> None:
+    rule = rule_named("simply_wall_st_footer")
+    opening = "IBM trades below our estimate of fair value."
+    for footer in (
+        " Have feedback on this article? Concerned about the content? Get in touch with us.",
+        " This article by Simply Wall St is general in nature. We provide commentary based on "
+        "historical data.",
+    ):
+        assert apply_rule(opening + footer, rule).strip() == opening
+
+
+def test_yahoo_quote_widget_block_removed() -> None:
+    rule = rule_named("yahoo_quote_widget")
+    body = (
+        "Shares slipped. Real Time Price • USD (INTC) 23.60 +0.42 (+1.81%) At close: February "
+        "18 at 4:00:02 PM EST Advanced Chart Analysts remain divided."
+    )
+    # The rule leaves its replacement space behind; `whitespace_final` collapses it.
+    assert apply_rule(body, rule) == "Shares slipped.  Analysts remain divided."
+
+
+def test_motley_fool_promo_matches_curly_apostrophe() -> None:
+    rule = rule_named("motley_fool_promo")
+    for apostrophe in ("'", "’"):
+        body = (
+            f"Apple had a strong quarter. Don{apostrophe}t miss this second chance at a "
+            "potentially lucrative opportunity. Stock Advisor returns as of February 7, 2025."
+        )
+        assert apply_rule(body, rule).strip() == "Apple had a strong quarter."
+
+
 def test_nbsp_and_whitespace_normalised() -> None:
     assert clean("a b   c\n\nd").text == "a b c d"
+    # The corpus carries NBSPs ("Vote Against\u00a0Unionizing"); \s is Unicode-aware.
+    nbsp = "\u00a0"
+    assert clean(f"a{nbsp}b{nbsp}{nbsp}c").text == "a b c"
 
 
 def test_truncation_boundary() -> None:
@@ -170,5 +222,6 @@ def test_real_corpus_has_no_boilerplate_marker_left(cleaned_bodies: list[str], m
 
 def test_real_corpus_truncation_rate_is_plausible(cleaned_bodies: list[str]) -> None:
     truncated = sum(len(b) < TRUNCATED_BELOW for b in cleaned_bodies)
-    # 22 bodies are under 400 chars pre-cleaning (CLAUDE.md); stubs get shorter, prose stays long.
+    # 22 bodies are under 400 chars pre-cleaning (see the README's data-findings table);
+    # stubs get shorter still, while real prose stays well clear of the line.
     assert 20 <= truncated <= 45, truncated

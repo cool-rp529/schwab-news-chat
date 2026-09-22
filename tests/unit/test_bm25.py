@@ -63,3 +63,20 @@ def test_contains(index: BM25Index) -> None:
 
 def test_empty_index_scores_nothing() -> None:
     assert BM25Index([]).score(["x"]) == []
+
+
+def test_precomputed_norms_match_the_inline_formula(index: BM25Index) -> None:
+    # Captured before the per-document length norm was hoisted out of `score`'s inner loop;
+    # the optimisation must be exactly score-preserving, not merely close.
+    assert index.score(["intel", "price", "nvidia"]) == [
+        0.33969042279879275,
+        1.7250325670064293,
+        1.2673397940273012,
+        0.375447309409192,
+    ]
+    assert index.score(["intel"]) == [
+        0.33969042279879275,
+        0.5783918009817282,
+        0.0,
+        0.375447309409192,
+    ]

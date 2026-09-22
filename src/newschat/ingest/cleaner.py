@@ -30,7 +30,9 @@ def _rule(name: str, pattern: str, replacement: str = " ") -> Rule:
 
 
 RULES: tuple[Rule, ...] = (
-    _rule("whitespace", r"[ \s]+"),
+    # Unicode-mode `\s` already covers the corpus NBSPs (e.g. "Vote Against\u00a0Unionizing"),
+    # so the literal space the class used to carry alongside it was redundant.
+    _rule("whitespace", r"\s+"),
     # ---- tails: from the marker to the end of the body ----
     _rule("mt_newswires_paywall", r"\s*PREMIUM Upgrade to read this MT Newswires article.*$"),
     _rule(
@@ -65,7 +67,7 @@ RULES: tuple[Rule, ...] = (
         "motley_fool_promo",
         r"\s*(?:Should you invest \$1,000 in [^?]{1,80}\?\s*)?"
         r"(?:Before you buy stock in .{0,1500}?"
-        r"|Don.t miss this second chance.{0,1500}?"
+        r"|Don['’]t miss this second chance.{0,1500}?"
         r"|Ever feel like you missed the boat.{0,1500}?)"
         r"\*?Stock Advisor returns as of " + _MONTH + r" \d{1,2}, \d{4}\.?",
     ),

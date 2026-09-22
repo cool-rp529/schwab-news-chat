@@ -20,8 +20,8 @@ class Article(BaseModel):
 
 class Hit(BaseModel):
     article: Article
-    score: float  # relative to the top hit, 0..1
-    raw_score: float  # BM25 before boosts, used by the refusal gate
+    score: float = Field(ge=0.0, le=1.0)  # relative to the top hit, 0..1
+    raw_score: float = Field(ge=0.0)  # BM25 before boosts, used by the refusal gate
     matched: int  # query keywords the article contains
     passages: list[str]
 

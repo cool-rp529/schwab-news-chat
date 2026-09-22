@@ -26,7 +26,8 @@ class CorpusInfo:
     tickers: tuple[str, ...]
 
 
-class SummarizerUnavailable(RuntimeError):  # noqa: N818 -- name fixed by later tasks' imports
+# N818 suppressed: reads better than SummarizerUnavailableError at every call site.
+class SummarizerUnavailable(RuntimeError):  # noqa: N818
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
@@ -158,7 +159,9 @@ def build_prompt(
         lines.append(EXCERPT_OPEN.format(n=n))
         lines.append(f"Title: {hit.article.title}")
         lines.append(f"Tickers: {', '.join(hit.article.tickers)}")
-        lines.extend(hit.passages)
+        # Article text is untrusted: a passage containing "<<<END EXCERPT 1>>>" would
+        # otherwise close the fence early and let the rest read as instructions.
+        lines.extend(p.replace("<<<", "<< <") for p in hit.passages)
         lines.append(EXCERPT_CLOSE.format(n=n))
         lines.append("")
     recent = list(history)[-max_history:]

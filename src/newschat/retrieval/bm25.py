@@ -18,6 +18,12 @@ class BM25Index:
         self.n_docs = len(docs)
         self._avg_len = (sum(self._lengths) / self.n_docs) if self.n_docs else 0.0
         self._df: Counter[str] = Counter(term for tf in self._tfs for term in tf)
+        # Length normalisation depends only on the document, so hoist it out of the
+        # per-(term, document) inner loop in `score`.
+        self._norms = [
+            k1 * (1 - b + b * length / self._avg_len) if self._avg_len else k1 * (1 - b)
+            for length in self._lengths
+        ]
 
     def df(self, term: str) -> int:
         return self._df.get(term, 0)
@@ -42,6 +48,5 @@ class BM25Index:
                 freq = tf.get(term, 0)
                 if not freq:
                     continue
-                norm = self.k1 * (1 - self.b + self.b * self._lengths[i] / self._avg_len)
-                scores[i] += weight * idf * (freq * (self.k1 + 1)) / (freq + norm)
+                scores[i] += weight * idf * (freq * (self.k1 + 1)) / (freq + self._norms[i])
         return scores
