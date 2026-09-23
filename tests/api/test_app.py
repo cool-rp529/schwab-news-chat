@@ -19,6 +19,17 @@ def test_index_serves_html(client: TestClient) -> None:
     assert r"/^https?:\/\//i.test(c.url)" in res.text
 
 
+def test_index_has_chat_controls_and_safe_rendering(client: TestClient) -> None:
+    page = client.get("/").text
+    assert 'id="new-topic"' in page and 'id="new-chat"' in page
+    assert '<textarea id="q"' in page and '<label for="q">' in page
+    assert '<ul id="log" aria-live="polite"' in page
+    assert r"/^https?:\/\//i.test(c.url)" in page
+    # Every piece of answer/article data is inserted as text; no HTML-parsing sinks at all.
+    for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"):
+        assert sink not in page
+
+
 def test_health(client: TestClient) -> None:
     body = client.get("/api/health").json()
     assert body == {

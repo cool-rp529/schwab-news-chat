@@ -5,27 +5,76 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>News Chat</title>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 1rem auto; padding: 0 1rem; }
+  :root {
+    --bg: #fff; --fg: #1a1a1a; --muted: #5a5a5a; --border: #d8d8d8;
+    --user: #e8eefc; --assistant: #f4f4f4; --system: #fafafa; --error: #fde8e8;
+    --chip: #e6f0ea; --hl: #fff4c2; --link: #0645ad;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161616; --fg: #e6e6e6; --muted: #a0a0a0; --border: #3a3a3a;
+      --user: #22304a; --assistant: #242424; --system: #1c1c1c; --error: #4a2323;
+      --chip: #23372b; --hl: #4a4220; --link: #8ab4f8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.45;
+    background: var(--bg); color: var(--fg); max-width: 48rem; margin: 0 auto; padding: 1rem; }
+  a { color: var(--link); }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+  h1 { font-size: 1.4rem; margin: 0; flex: 1; }
+  button { font: inherit; padding: .35rem .7rem; border: 1px solid var(--border); border-radius: .35rem;
+    background: var(--assistant); color: var(--fg); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #intro { color: var(--muted); margin: .25rem 0 0; }
   #log { list-style: none; padding: 0; }
-  .msg { margin: .75rem 0; padding: .75rem; border-radius: .5rem; white-space: pre-wrap; }
-  .user { background: #eef; }
-  .assistant { background: #f4f4f4; }
-  .error { background: #fee; }
-  .meta { font-size: .8rem; color: #555; margin-top: .5rem; white-space: normal; }
-  .cite { white-space: normal; margin-top: .5rem; }
-  .cite summary { cursor: pointer; }
-  .passage { font-style: italic; margin: .25rem 0 .5rem 1rem; }
-  form { display: flex; gap: .5rem; align-items: center; }
-  input { flex: 1; padding: .5rem; }
+  .msg { margin: .75rem 0; padding: .75rem; border-radius: .5rem; overflow-wrap: anywhere; }
+  .msg p { margin: .4rem 0; }
+  .user { background: var(--user); white-space: pre-wrap; margin-left: 2rem; }
+  .assistant { background: var(--assistant); }
+  .system { background: var(--system); border: 1px dashed var(--border); color: var(--muted); }
+  .error { background: var(--error); }
+  .pending { color: var(--muted); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .pending { animation: none; } }
+  .caption, .meta, .advisory { font-size: .8rem; color: var(--muted); }
+  .lead { font-weight: 600; }
+  .msg h4 { margin: .75rem 0 .25rem; font-size: .95rem; }
+  .msg ul { margin: .25rem 0; padding-left: 1.25rem; }
+  .fn { padding: 0 .15rem; border: 0; background: none; color: var(--link); font-size: .8em;
+    vertical-align: super; line-height: 1; }
+  .sources { margin: .75rem 0 .25rem; padding-left: 0; list-style: none; font-size: .9rem;
+    border-top: 1px solid var(--border); }
+  .sources > li { padding: .35rem .25rem; border-radius: .3rem; }
+  .sources > li.hl { background: var(--hl); }
+  .chip { display: inline-block; font-size: .75rem; padding: 0 .35rem; margin-left: .3rem;
+    border-radius: .6rem; background: var(--chip); }
+  .kind, .unverified { font-size: .75rem; color: var(--muted); margin-left: .4rem; }
+  .unverified { font-style: italic; }
+  .sources details summary { cursor: pointer; font-size: .8rem; color: var(--muted); }
+  .passage { font-style: italic; margin: .25rem 0 .25rem 1rem; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; }
+  .meta button { font-size: .75rem; padding: .1rem .5rem; }
+  .tag { border: 1px solid var(--border); border-radius: .6rem; padding: 0 .4rem; }
+  form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; }
+  form label { width: 100%; font-size: .85rem; color: var(--muted); }
+  textarea { flex: 1; min-width: 0; font: inherit; padding: .5rem; resize: none; overflow-y: auto;
+    max-height: 7rem; background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: .35rem; }
+  footer { font-size: .8rem; color: var(--muted); }
 </style>
 </head>
 <body>
-<h1>News Chat</h1>
+<header>
+  <h1>News Chat</h1>
+  <button id="new-topic" type="button">New topic</button>
+  <button id="new-chat" type="button">New chat</button>
+</header>
 <p id="intro">Ask about the news set. <span id="period"></span></p>
 <ul id="log" aria-live="polite" aria-relevant="additions"></ul>
 <form id="form">
-  <label for="q">Your question</label>
-  <input id="q" name="q" autocomplete="off" maxlength="1000" required>
+  <label for="q">Your question (Enter sends, Shift+Enter for a new line, Esc clears)</label>
+  <textarea id="q" name="q" rows="1" autocomplete="off" maxlength="1000" required></textarea>
   <button id="send" type="submit">Send</button>
 </form>
 <footer><p id="footer"></p></footer>
@@ -35,8 +84,12 @@
   const form = document.getElementById('form');
   const input = document.getElementById('q');
   const send = document.getElementById('send');
+  const newTopic = document.getElementById('new-topic');
+  const newChat = document.getElementById('new-chat');
   const SESSION_KEY = 'newschat.session';
+  const KIND_LABEL = { event: 'reported', opinion: 'analyst view', promo: 'promotional' };
   let sessionId = null;
+  let busy = false;
   try { sessionId = sessionStorage.getItem(SESSION_KEY); } catch (e) { /* storage unavailable */ }
 
   // All data goes through textContent / createElement: article text is untrusted third-party HTML-derived text.
@@ -66,40 +119,130 @@
     }
   }
 
+  // Append text to parent, turning each [n] that names a listed source into a footnote button.
+  function appendInline(parent, text, sources) {
+    const re = /\[(\d+)\]/g;
+    let last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      const item = sources.get(Number(m[1]));
+      if (!item) continue;
+      if (m.index > last) parent.append(text.slice(last, m.index));
+      const fn = el('button', 'fn', m[0]);
+      fn.type = 'button';
+      fn.setAttribute('aria-label', 'Show source ' + m[1]);
+      fn.addEventListener('click', () => showSource(item));
+      parent.append(fn);
+      last = re.lastIndex;
+    }
+    if (last < text.length) parent.append(text.slice(last));
+  }
+  function showSource(item) {
+    item.parentNode.querySelectorAll('li.hl').forEach((x) => x.classList.remove('hl'));
+    item.classList.add('hl');
+    item.querySelector('details').open = true;
+    item.scrollIntoView({ block: 'nearest' });
+  }
+
+  // Maps answer.text line by line onto elements; works for the extractive layout and free prose.
+  function renderText(box, text, sources) {
+    let list = null, inSources = false;
+    for (const raw of text.split('\n')) {
+      const t = raw.trim();
+      if (!t) { list = null; continue; }
+      if (inSources && /^\[\d+\]/.test(t)) continue;
+      inSources = false;
+      if (/^Based on news from .*:$/.test(t)) box.append(el('p', 'caption', t));
+      else if (/^\(.*\)$/.test(t)) box.append(el('p', 'caption', t));
+      else if (/^Informational summary .*not investment advice\.?$/.test(t)) box.append(el('p', 'advisory', t));
+      else if (/^From \d+ articles? on .*:$/.test(t)) box.append(el('p', 'lead', t));
+      else if (/^(What happened|Analyst views|Promotional)$/.test(t)) { box.append(el('h4', null, t)); list = null; }
+      else if (t === 'Sources') { inSources = true; list = null; }
+      else if (/^[-*•] /.test(t)) {
+        if (!list) { list = el('ul'); box.append(list); }
+        const li = el('li');
+        appendInline(li, t.slice(2), sources);
+        list.append(li);
+      } else {
+        list = null;
+        const p = el('p');
+        appendInline(p, t, sources);
+        box.append(p);
+      }
+    }
+  }
+
   function renderCitation(c) {
-    const details = el('details', 'cite');
-    const summary = el('summary');
-    const link = el('a', null, '[' + c.n + '] ' + c.title);
+    const item = el('li');
+    item.dataset.n = c.n;
+    item.append(el('span', null, '[' + c.n + '] '));
+    const link = el('a', null, c.title);
     // Second layer: the loader already rejects non-http(s) links, but href is the one
     // place article data becomes executable, so never assign it unvalidated.
     link.href = /^https?:\/\//i.test(c.url) ? c.url : '#';
     link.target = '_blank'; link.rel = 'noopener';
-    summary.appendChild(link);
-    summary.appendChild(el('span', null,
-      ' — ' + c.tickers.join(', ') + ' · ' + c.kind + (c.verified ? '' : ' · unverified')));
-    details.appendChild(summary);
-    details.appendChild(el('p', 'passage', c.passage || '(no passage)'));
+    item.append(link);
+    c.tickers.forEach((t) => item.append(el('span', 'chip', t)));
+    item.append(el('span', 'kind', KIND_LABEL[c.kind] || c.kind));
+    if (!c.verified) item.append(el('span', 'unverified', 'unverified'));
+    const details = el('details');
+    details.append(el('summary', null, 'Passage'), el('p', 'passage', c.passage || '(no passage)'));
     details.addEventListener('toggle', async () => {
       if (!details.open || details.dataset.loaded) return;
       details.dataset.loaded = '1';
       try {
-        const a = await (await fetch('/api/articles/' + encodeURIComponent(c.article_id))).json();
-        details.appendChild(el('p', 'meta',
-          a.word_count + ' words' + (a.is_truncated ? ' · truncated source' : '')));
+        const res = await fetch('/api/articles/' + encodeURIComponent(c.article_id));
+        if (!res.ok) throw new Error(String(res.status));
+        const a = await res.json();
+        details.append(el('p', 'meta', a.word_count + ' words' + (a.is_truncated ? ' · truncated source' : '')));
       } catch (e) {
-        details.appendChild(el('p', 'meta', 'Could not load article.'));
+        details.append(el('p', 'meta', 'Could not load article.'));
       }
     });
-    return details;
+    item.append(details);
+    return item;
   }
 
-  form.addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-    const question = input.value.trim();
-    if (!question) return;
+  function renderAnswer(li, a) {
+    li.className = 'msg ' + (a.covered ? 'assistant' : 'system');
+    li.replaceChildren();
+    const sources = new Map();
+    const ol = el('ol', 'sources');
+    a.citations.forEach((c) => { const item = renderCitation(c); sources.set(c.n, item); ol.append(item); });
+    const body = el('div');
+    renderText(body, a.text, sources);
+    const advisory = body.querySelector('.advisory');
+    li.append(body);
+    if (a.citations.length) li.append(ol);
+    if (advisory) li.append(advisory);  // keep the advisory as the bubble's footer
+    const meta = el('div', 'meta');
+    meta.append(el('span', null, 'backend: ' + a.backend));
+    const inh = a.query && a.query.inheritance;
+    if (inh === 'strong' || inh === 'soft') meta.append(el('span', 'tag', 'follow-up'));
+    const copy = el('button', null, 'Copy');
+    copy.type = 'button';
+    copy.addEventListener('click', () => {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+      navigator.clipboard.writeText(a.text).then(() => { copy.textContent = 'Copied'; }, () => {});
+    });
+    meta.append(copy);
+    li.append(meta);
+  }
+
+  function setBusy(on) {
+    busy = on;
+    [input, send, newTopic, newChat].forEach((x) => { x.disabled = on; });
+  }
+  function grow() {
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 2 + 'px';
+  }
+
+  async function ask(question) {
+    if (busy || !question) return;
     bubble('user', question);
-    input.value = ''; input.disabled = true; send.disabled = true;
-    const pending = bubble('assistant', 'Thinking…');
+    input.value = ''; grow();
+    setBusy(true);
+    const pending = bubble('assistant pending', 'Thinking…');
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -110,20 +253,31 @@
       const data = await res.json();
       sessionId = data.session_id;
       try { sessionStorage.setItem(SESSION_KEY, sessionId); } catch (e) { /* ignore */ }
-      const a = data.answer;
-      pending.textContent = a.text;
-      if (a.citations.length) {
-        const box = el('div');
-        a.citations.forEach((c) => box.appendChild(renderCitation(c)));
-        pending.appendChild(box);
-      }
-      pending.appendChild(el('div', 'meta', 'backend: ' + a.backend + (a.covered ? '' : ' · not covered')));
+      renderAnswer(pending, data.answer);
     } catch (err) {
       pending.className = 'msg error';
       pending.textContent = 'Request failed — ' + err.message;
     } finally {
-      input.disabled = false; send.disabled = false; input.focus();
+      setBusy(false); input.focus();
     }
+  }
+
+  form.addEventListener('submit', (ev) => { ev.preventDefault(); ask(input.value.trim()); });
+  input.addEventListener('input', grow);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) {
+      ev.preventDefault();
+      if (!busy) ask(input.value.trim());
+    } else if (ev.key === 'Escape') {
+      input.value = ''; grow();
+    }
+  });
+  newTopic.addEventListener('click', () => ask('new topic'));
+  newChat.addEventListener('click', () => {
+    sessionId = null;
+    try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
+    log.replaceChildren();
+    input.focus();
   });
 
   loadHealth();

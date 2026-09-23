@@ -28,6 +28,15 @@ uv sync && uv run pytest -q && uv run python -m newschat serve
 
 Then open `http://127.0.0.1:8000`.
 
+The page renders each answer as structure rather than raw text: the as-of
+line and follow-up note as captions, the claim-type groups as headings with
+bullets, and every `[n]` marker as a footnote button that highlights and
+expands the matching entry in the answer's source list (title link, ticker
+chips, claim kind, grounding passage, and word count fetched on demand).
+Refusals, small talk and clarifications are shown muted; "New topic" resets
+the follow-up context, "New chat" starts a fresh session, and each answer has
+a Copy button. Enter sends, Shift+Enter adds a line, and Esc clears the input.
+
 Two more entry points: `python -m newschat ask "What's going on with Intel?"`
 prints a single answer to the terminal (add `--backend claude-cli` to opt
 into the LLM path described below); `python -m newschat eval` reprints the
