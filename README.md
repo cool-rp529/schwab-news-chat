@@ -16,31 +16,52 @@ three axes: **code quality** (see [Architecture](#architecture) and
 [Testing](#testing)). UI styling is explicitly out of scope and was not a
 focus here.
 
+**Contents:** [Quick start](#quick-start) · [What it does](#what-it-does) ·
+[The data](#the-data-and-what-it-forced) · [Architecture](#architecture) ·
+[API reference](#api-reference) · [Configuration](#configuration) ·
+[Claim types](#claim-types) · [Testing](#testing) · [Design decisions](#design-decisions) ·
+[Limitations](#limitations-and-next-steps) · [Repository notes](#repository-notes)
+
 ## Quick start
 
+**Requirements:** Python ≥ 3.12. [`uv`](https://docs.astral.sh/uv/) is
+recommended but optional. No API key and no network access are needed for the
+default path (after dependencies are installed).
+
 ```bash
-uv sync && uv run pytest -q && uv run python -m newschat serve
-# without uv:
-#   python -m venv .venv && . .venv/bin/activate && pip install -e .
-#   pip install pytest pytest-cov httpx ruff mypy types-PyYAML
-#   pytest -q && python -m newschat serve
+uv sync
+uv run pytest -q                  # full suite, offline
+uv run python -m newschat serve   # then open http://127.0.0.1:8000
 ```
 
-Then open `http://127.0.0.1:8000`.
+Without `uv`, use a virtual environment and install the package plus dev tools:
 
-The page renders each answer as structure rather than raw text: the as-of
-line and follow-up note as captions, the claim-type groups as headings with
-bullets, and every `[n]` marker as a footnote button that highlights and
-expands the matching entry in the answer's source list (title link, ticker
-chips, claim kind, grounding passage, and word count fetched on demand).
-Refusals, small talk and clarifications are shown muted; "New topic" resets
-the follow-up context, "New chat" starts a fresh session, and each answer has
-a Copy button. Enter sends, Shift+Enter adds a line, and Esc clears the input.
+```bash
+# macOS / Linux (bash, zsh)
+python -m venv .venv && . .venv/bin/activate
+pip install -e . pytest pytest-cov httpx ruff mypy types-PyYAML
+pytest -q && python -m newschat serve
+```
 
-Two more entry points: `python -m newschat ask "What's going on with Intel?"`
-prints a single answer to the terminal (add `--backend claude-cli` to opt
-into the LLM path described below); `python -m newschat eval` reprints the
-golden-set metrics table shown in [Testing](#testing).
+```powershell
+# Windows PowerShell
+python -m venv .venv; .\.venv\Scripts\Activate.ps1
+pip install -e . pytest pytest-cov httpx ruff mypy types-PyYAML
+pytest -q; python -m newschat serve
+```
+
+The CLI reconfigures its own stdout to UTF-8, so answers (which contain `≈`
+and `—`) print correctly in any console; only `pytest -s` output on a legacy
+Windows code page may need `PYTHONIOENCODING=utf-8`.
+
+Other entry points: `python -m newschat ask "What's going on with Intel?"`
+prints one answer (add `--backend claude-cli` for the opt-in LLM path), and
+`python -m newschat eval` reprints the metrics table in [Testing](#testing).
+
+The page renders claim-type groups as headings with bullets and each `[n]` as
+a footnote button that expands the matching source (title link, tickers, claim
+kind, grounding passage, word count). "New topic" resets the follow-up context,
+"New chat" starts a fresh session, and each answer has a Copy button.
 
 ## What it does
 
@@ -68,46 +89,48 @@ Sources
 Informational summary of news coverage — not investment advice.
 ```
 
-A follow-up in the same session — "who might buy it?" — has no ticker of its
-own, so the query analyzer inherits the ticker and the thread's topic (the
-prior turn's keywords plus whatever context that turn had itself inherited)
-from the last turn that had a ticker, and the answer says so explicitly:
-`(Interpreting the follow-up as being about INTC.)`. That inherited-resolution
-note is the only way a reader can tell the anaphora was resolved at all,
-rather than silently answering about the wrong company. A follow-up with a
-reference word ("it", "the company") inherits strongly: retrieval is
-restricted to the inherited ticker first. A short follow-up with no reference
-word ("And the price target?", "DeepSeek") inherits softly: the ticker only
-boosts the ranking, so a short new topic still reaches its own articles, and
-the note — `(Reading this as a follow-up about INTC; say "new topic" or name a
-company to reset.)` — appears only when an inherited-ticker article is actually
-cited. Saying "new topic" ends the thread, and the carried topic is capped at
-its eight most recent words. A short follow-up
-inherits the previous ticker only when every word in it is in the corpus
-vocabulary — "What's the Bitcoin price?" after an Intel question is treated as
-a new (and refused) question, not as a follow-up, so an inherited ticker can
-never carry an out-of-corpus question past the refusal gate. More transcripts,
-including four captured against the Claude CLI backend, are committed in
-[`examples/transcripts.md`](examples/transcripts.md).
+More transcripts, including four captured against the Claude CLI backend, are
+in [`examples/transcripts.md`](examples/transcripts.md).
 
-Conversational turns that are not news questions are handled before retrieval.
-Greetings, thanks, goodbyes, "who are you" and "what can you do" get a short,
-citation-free reply (the last two describe the covered tickers and period)
-instead of being searched for as keywords. When a pronoun has no antecedent
-and the question names no specific topic — "Who might buy it?" as the first
-question, or right after "new topic" — the reply is `Which company do you
-mean?` rather than an answer about whichever articles mention "buy"; "What is
-this DeepSeek thing?" is searched as usual. Neither kind of turn carries a
-ticker, so neither can become the antecedent of a later "it". Input is
-NFKC-normalised, so fullwidth "Ｉｎｔｅｌ" reads as "Intel", and a cashtag such as
-`$INTC` is searched as the plain ticker `intc`.
+### How a question is answered
+
+1. **Conversational turns first.** Greetings, thanks, goodbyes, "who are you"
+   and "what can you do" get a short citation-free reply instead of a search
+   (the last two list the covered tickers and period).
+2. **Resolve the query.** Input is NFKC-normalised (fullwidth "Ｉｎｔｅｌ" reads
+   as "Intel"; a cashtag such as `$INTC` is searched as `intc`); company names
+   and aliases map to tickers; the remaining words become keywords; follow-up
+   rules (below) may inherit a ticker and topic from earlier turns.
+3. **Retrieve.** BM25 over cleaned bodies, with a ticker boost, a truncation
+   penalty, and carried-over topic words at half weight.
+4. **Refusal gate.** An absolute evidence floor (see
+   [Architecture](#architecture)); if nothing clears it, the answer says the
+   corpus doesn't cover the question.
+5. **Summarize.** `extractive` (default, deterministic) or `claude-cli`
+   (opt-in), both behind one `Summarizer` protocol.
+6. **Envelope.** As-of period, follow-up note, per-citation faithfulness check
+   and advice line, applied whichever backend produced the answer.
+
+### Follow-up rules
+
+A follow-up inherits from the latest turn that had a ticker: that ticker, plus
+the turn's keywords and whatever it had itself inherited (capped at the eight
+most recent words). Small talk and clarifications carry no ticker, so they
+never become the antecedent of a later "it".
+
+| Kind | When | Effect |
+|---|---|---|
+| **strong** | A reference word: "it", "they", "that", "the company", "the stock", … ("Who might buy it?") | Inherits ticker and topic; retrieval is restricted to the inherited ticker first. Note: `(Interpreting the follow-up as being about INTC.)` |
+| **soft** | No reference word, at most four words, and every keyword is in the corpus vocabulary ("And the price target?", "DeepSeek") | Ticker is only a ranking boost, so a short new topic still reaches its own articles. Note `(Reading this as a follow-up about INTC; say "new topic" or name a company to reset.)` appears only if an inherited-ticker article is actually cited |
+| **none** | The question names a ticker; is longer than four words with no reference word; or is short but contains a word the corpus never uses ("What's the Bitcoin price?") | Treated as a new question, so an inherited ticker can never carry an out-of-corpus question past the refusal gate |
+| **reset** | The question contains "new topic" | Ends the thread; later turns never inherit from behind it |
+| **clarification** | A reference word with no earlier ticker in the thread, and no specific (rare) topic word ("Who might buy it?" as the first question) | Reply is `Which company do you mean?`; "What is this DeepSeek thing?" is searched as usual |
 
 ## The data, and what it forced
 
 `stock_news.json` is a dict keyed by ticker, each entry a list of articles
 with exactly four fields — `title`, `link`, `ticker`, `full_text` — and **no
-date field**. Several properties of the real file drove specific design
-choices rather than generic ones:
+date field**. Properties of the real file drove specific design choices:
 
 | Finding | Design response |
 |---|---|
@@ -115,7 +138,7 @@ choices rather than generic ones:
 | 4 of those 13 duplicate groups have **divergent bodies** (drifting relative timestamps, a Yahoo video-carousel sidebar) despite identical titles | "First occurrence" is a dict-ordering coin flip; dedupe keeps the **longest** body instead, deterministically |
 | 13 MT Newswires paywall stubs, 11 "Continue Reading View Comments" stubs | Stripped by rule; flagged `is_truncated`; down-ranked at retrieval time rather than excluded, so a truncated article can still surface when nothing else matches. The stubs are cut **mid-word** (~100 chars), so `is_prose()` also requires a terminal stop — otherwise a bullet reads "…a benchmark of more than 1,400 free [1]" |
 | Insider Monkey listicle boilerplate, Motley Fool promo and options-disclosure paragraphs, Zacks footers, an embedded Yahoo video carousel | Stripped so none of it can be selected as a cited passage — an unrelated carousel headline being cited as "news" would be worse than not having it |
-| The date trap: bare `Month YYYY` mentions are dominated by "returned 275% since **May 2014**" (Insider Monkey boilerplate, 10 bodies) and "long **January 2026** $395 calls" (Motley Fool options-disclosure boilerplate, 9 bodies) | `infer_period()` counts only **full `Month D, YYYY` dates** (17 bodies carry one), never bare month-year mentions; a test asserts the real corpus yields "February 2025", not either boilerplate trap |
+| The date trap: bare `Month YYYY` mentions are dominated by "returned 275% since **May 2014**" (Insider Monkey boilerplate, 10 articles) and "long **January 2026** $395 calls" (Motley Fool options-disclosure boilerplate, 9 mentions in 5 articles) | `infer_period()` counts only **full `Month D, YYYY` dates** (25 of the 118 cleaned articles carry one), never bare month-year mentions; a test asserts the real corpus yields "February 2025", not either boilerplate trap |
 | The ticker key is unreliable as a filter — a fleet-management market report sits under IBM, a Suze Orman piece under AAPL | Ticker is used as a retrieval **boost**, never a hard filter; ranking is primarily on text |
 
 The cleaner (`ingest/cleaner.py`) applies 19 named, order-sensitive regexes —
@@ -140,7 +163,10 @@ question ─► QueryAnalyzer ─► Retriever ─► Summarizer ─► Answer
 
 ```
 schwab-news-chat/
+├── .github/workflows/ci.yml   # lint, format, types, tests + coverage floor on push/PR
 ├── data/stock_news.json
+├── examples/                  # committed evidence: eval report, coverage, transcripts
+├── scripts/measure_gate.py    # measures the refusal-gate constants against the corpus
 ├── src/newschat/
 │   ├── models.py              # Article, Hit, Citation, Answer, ChatTurn, ResolvedQuery
 │   ├── ingest/
@@ -175,173 +201,211 @@ schwab-news-chat/
     ├── unit/                  # one test module per source module
     ├── api/                   # TestClient tests
     ├── eval/                  # golden.yaml + metric thresholds
-    └── llm/                   # Claude CLI tests, skipped by default
+    └── llm/                   # live Claude CLI test, skipped by default
 ```
 
-Dependency direction is strictly downward: `api → chat → (retrieval,
-summarize) → (text, ingest) → models`. No module imports from a layer above
-it, which keeps the extractive path (and every test except the eval harness
-and the API layer) free of any FastAPI or subprocess dependency.
+Dependencies point strictly downward: `api → chat → (retrieval, summarize) →
+(text, ingest) → models`, which keeps the extractive path (and every test
+except the eval harness and API layer) free of FastAPI and subprocesses.
 
 **Retrieval.** An in-house BM25 index (title tokens counted twice as a cheap
-field boost) scores the query against cleaned bodies; ticker-matched articles
-get a 1.5× boost, truncated articles a 0.5× penalty. The refusal gate is
-deliberately **absolute, not relative**: normalising scores by the top hit
-makes the best-scoring article 1.0 by construction, so a relative floor alone
-can never refuse — measured against this corpus, a purely relative filter
+field boost) scores cleaned bodies; ticker-matched articles get a 1.5× boost,
+truncated articles a 0.5× penalty. The refusal gate is **absolute, not
+relative**: normalising by the top hit makes the best article 1.0 by
+construction, so a relative floor alone never refuses — measured here, it
 returned five confidently cited hits for "What is the weather in Paris
-tomorrow?" and "Who won the 2022 FIFA World Cup?". Instead, a non-ticker-
-matched article must clear `min_strength = 1.0` **and** an idf-weighted
-keyword coverage of `min_coverage = 0.45` (Σidf(matched keywords) /
-Σidf(all keywords) — terms the corpus never mentions carry maximum idf and
-sink a query below the floor) *before* any normalisation happens.
+tomorrow?" and "Who won the 2022 FIFA World Cup?". Instead, a non-ticker-matched
+article must clear `min_strength = 1.0` **and** idf-weighted keyword coverage
+`min_coverage = 0.45` (Σidf(matched) / Σidf(all keywords); words the corpus
+never uses carry maximum idf) *before* any normalisation.
 
 Strength is `raw BM25 / Σidf(query keywords)`, not raw BM25. Raw BM25 sums
-over query terms, so a fixed raw floor measures how many rare words a
-question happens to contain rather than how well the corpus answers it: a
-one-term query is bounded by about `idf × (k1 + 1)`, so "Tell me about
-DeepSeek" — a topic covered by 11 articles, at perfect keyword coverage —
-scored 5.08 and was refused by a floor calibrated on three-term queries.
-Dividing by total idf yields the idf-weighted mean term saturation, bounded
-by `k1 + 1` for every query length, so one floor means the same thing
-whether the question is "DeepSeek" or "How is DeepSeek affecting AI
-stocks?".
-Ticker-matched articles bypass the gate but still need at least one matching
-keyword. Both constants were measured against the real corpus and its
-negatives by `scripts/measure_gate.py` (see
+over query terms, so a raw floor measures how many rare words a question
+contains rather than how well the corpus answers it: "Tell me about DeepSeek"
+(11 articles, perfect coverage) is bounded by about `idf × (k1 + 1)`, scores
+about 5.1 raw, and was refused by a floor calibrated on three-term queries.
+Dividing by total idf gives the idf-weighted mean term saturation, bounded by
+`k1 + 1` at every query length, so one floor means the same thing for
+"DeepSeek" and "How is DeepSeek affecting AI stocks?". Ticker-matched articles
+bypass the gate but still need one matching keyword. Both constants were
+measured by `scripts/measure_gate.py` (see
 [Repository notes](#repository-notes)), not guessed.
 
-**Summarization.** The default backend, `extractive`, scores candidate
-sentences by query-term overlap plus rank/position bonuses, selects greedily
-with MMR to avoid near-duplicates, caps at 5 bullets, and groups them under
-headings by claim type ("What happened" / "Analyst views" / "Promotional",
-empty groups omitted). Fully deterministic, no network or API key required.
-`claude-cli` (below) is the alternative implementation of the same
-`Summarizer` protocol.
+**Summarization.** `extractive` scores sentences by query-term overlap plus
+rank/position bonuses, selects greedily with MMR to avoid near-duplicates,
+caps at 5 bullets, and groups them by claim type ("What happened" / "Analyst
+views" / "Promotional"). It is deterministic and needs no network or key;
+`claude-cli` is the alternative implementation of the same protocol.
 
-**The envelope.** The not-investment-advice line, the `as_of` corpus-period
-stamp, the inherited-follow-up note, and the citation faithfulness check
-(`check_faithfulness` — token-set overlap between a cited claim and its
-source passage) all live in `summarize/base.py`, not in any one backend: a
-control written only into an LLM prompt does not exist on the extractive
-path, which is the path a keyless reviewer actually runs, so these apply to
-every `Answer` regardless of which summarizer produced it.
+**The envelope.** The advice line, the `as_of` stamp, the follow-up note,
+and the citation faithfulness check (`check_faithfulness` — token-set overlap
+between a cited claim and its source passage) live in `summarize/base.py`,
+not in a backend: a control written only into an LLM prompt does not exist on
+the extractive path a keyless reviewer runs.
 
-**The Claude CLI backend** is opt-in only — `NEWSCHAT_BACKEND=claude-cli` or
-`--backend claude-cli`, model via `NEWSCHAT_CLAUDE_MODEL` — never selected
-just because `claude` is on `PATH`, which would silently spend a reviewer's
-own subscription on an untested path. When enabled, the question, the
-retrieved excerpts, and the last 3 turns of history leave the machine as
-part of a prompt sent to Anthropic via the CLI (`/api/health` exposes
-`sends_data_to_third_party`). Excerpts are treated as untrusted data, wrapped
-in delimiters with an instruction to ignore anything instruction-like inside
-them. The CLI (`claude -p --output-format json`) can exit 0 with parseable
-JSON even when the run actually failed (usage limit, API overload, max
-turns); that in-band failure is caught by checking `is_error`, `subtype`,
-`api_error_status`, and whether `result` is present — not just the exit
-code. Any CLI failure, in-band or not, raises `SummarizerUnavailable`;
-`ChatService` falls back to extractive and `Answer.backend` says so, e.g.
-`extractive (fallback: cli not found)`.
+**The Claude CLI backend** is opt-in only (see [Configuration](#configuration)),
+never selected just because `claude` is on `PATH`, which would silently spend a
+reviewer's own subscription on an untested path. When enabled, the question,
+the retrieved excerpts, and the last 3 turns of history are sent to Anthropic
+via the CLI (`/api/health` reports `sends_data_to_third_party`). Excerpts are
+wrapped in delimiters as untrusted data. `claude -p --output-format json` can
+exit 0 with parseable JSON when the run failed (usage limit, overload, max
+turns), so `is_error`, `subtype`, `api_error_status` and a missing `result`
+are all checked. Any failure raises `SummarizerUnavailable`; `ChatService`
+falls back to extractive and says so in `Answer.backend`, e.g.
+`extractive (fallback: 'claude' not found on PATH)`.
+
+## API reference
+
+The server (`python -m newschat serve`) exposes three JSON endpoints plus the
+page at `/`. FastAPI also serves interactive docs at `/docs`.
+
+**`POST /api/chat`** — ask one question.
+
+| Request field | Type | Notes |
+|---|---|---|
+| `question` | string, 1–1000 chars | Required. Blank-after-trim or longer than 1000 → **422** |
+| `session_id` | string ≤ 64 chars, optional | Omit to start a session; send the returned id back for follow-ups |
+
+A missing, empty or over-long field returns FastAPI's validation error; a
+whitespace-only question returns `{"detail": "question must not be blank"}`.
+An unknown `session_id` starts a new history under that id. The response is
+`{"session_id": str, "answer": Answer}`:
+
+| `Answer` field | Meaning |
+|---|---|
+| `text` | The full rendered answer, as printed by `ask` |
+| `citations[]` | `n` (the `[n]` marker), `article_id`, `title`, `url`, `tickers`, `passage` (the grounding sentence), `verified` (passed `check_faithfulness`), `kind` (`event` \| `opinion` \| `promo`) |
+| `backend` | `extractive`, `claude-cli`, or `extractive (fallback: <reason>)` |
+| `covered` | `false` for refusals, small talk and clarifications |
+| `as_of` | Inferred corpus period, e.g. `February 2025` |
+| `advisory` | The not-investment-advice line |
+| `query` | How the question was read: `text`, `tickers`, `keywords`, `context_keywords` (topic carried from earlier turns), `inherited_tickers`, `inheritance` (`none` \| `strong` \| `soft`), `unresolved_reference`, `inherited_keywords` |
+
+**`GET /api/articles/{article_id}`** — 200 with the full `Article` (`id`,
+`title`, `url`, `source`, `tickers`, `text` (cleaned body), `is_truncated`,
+`word_count`), or 404 for an unknown id. The page uses it to expand a
+citation.
+
+**`GET /api/health`** — `articles` (118), `unique_tickers`, `backend`,
+`period`, and `sends_data_to_third_party` (`true` only when the backend is not
+`extractive`).
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/chat -H "Content-Type: application/json" \
+  -d '{"question": "What is going on with Intel?"}'
+# follow-up: reuse the session_id from the first response
+curl -s -X POST http://127.0.0.1:8000/api/chat -H "Content-Type: application/json" \
+  -d '{"question": "Who might buy it?", "session_id": "<session_id>"}'
+```
+
+In Windows PowerShell (where `curl` is an alias for `Invoke-WebRequest`):
+
+```powershell
+$u = "http://127.0.0.1:8000/api/chat"
+$r = Invoke-RestMethod $u -Method Post -ContentType application/json -Body '{"question": "What is going on with Intel?"}'
+Invoke-RestMethod $u -Method Post -ContentType application/json -Body (@{question = "Who might buy it?"; session_id = $r.session_id} | ConvertTo-Json)
+```
+
+## Configuration
+
+| Setting | Default | Effect |
+|---|---|---|
+| `NEWSCHAT_BACKEND` | `extractive` | `extractive` or `claude-cli` (opt-in LLM path; needs the Claude Code CLI on `PATH`) |
+| `NEWSCHAT_CLAUDE_MODEL` | CLI's default | Model passed to `claude -p` when the backend is `claude-cli` |
+| `NEWSCHAT_DATA` | `data/stock_news.json` | Path to another JSON file of the same shape (dict of ticker → list of `title`/`link`/`ticker`/`full_text`) |
+| `NEWSCHAT_RUN_LLM_TESTS` | unset | `1` enables the live Claude CLI test (also needs `claude` on `PATH`) |
+
+CLI flags: `ask QUESTION [--backend extractive|claude-cli] [--data PATH]`;
+`eval [--golden PATH] [--data PATH]` (exit 1 if an asserted threshold fails);
+`serve [--host 127.0.0.1] [--port 8000]`. Flags override the environment.
+Sessions are in memory (6 turns each, at most 1000) and lost on restart.
 
 ## Claim types
 
 Roughly a quarter of the 118 articles are analyst pitches, Zacks ranks, and
-Motley Fool promos rather than reported news, so "what's happening with
-Nvidia?" is partly a question about separating events from opinion and
-promotion. `summarize/claims.py` classifies each candidate passage with an
-ordered, most-specific-first list of named regex rules: `promo` matches
-first-person promotional/listicle language ("we recently compiled",
-"subscribe", "returned N% since", "Motley Fool Stock Advisor"); `opinion`
-matches analyst and rating language ("price target", "Zacks Rank", "Strong
-Buy", "downgrade/upgrade", "analysts say/expect"); anything else defaults to
-`event`. It's deliberately coarse, deterministic, and rules-based rather than
-LLM-labelled, so it's visible and testable on the default keyless backend.
-Measured accuracy on the golden set is 0.80 — exactly at the assertion floor
-(see [Testing](#testing)), an honest reflection of what a handful of regex
-rules can do on prose this varied, not a tuned number.
+Motley Fool promos rather than reported news, so answers separate events from
+opinion and promotion. `summarize/claims.py` applies an ordered,
+most-specific-first list of named regex rules: `promo` matches promotional or
+listicle language ("we recently compiled", "subscribe", "returned N% since",
+"Motley Fool Stock Advisor"); `opinion` matches analyst and rating language
+("price target", "Zacks Rank", "Strong Buy", "downgrade/upgrade", "analysts
+say/expect"); anything else is `event`. It is coarse, deterministic and
+testable on the keyless backend. Measured accuracy on the golden set is 0.80 —
+exactly at the assertion floor (see [Testing](#testing)), not a tuned number.
 
 ## Testing
 
 [![CI](https://github.com/cool-rp529/schwab-news-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/cool-rp529/schwab-news-chat/actions/workflows/ci.yml)
 
 ```bash
-uv run pytest -q                                    # full suite, offline, ~9s
+uv run pytest -q                                    # 369 tests, offline, ~10 s (1 skipped: live CLI)
 uv run pytest -m llm                                # LLM-path tests (see below)
 uv run pytest --cov=newschat --cov-report=term-missing
-uv run ruff check . && uv run mypy src
+uv run ruff check . && uv run ruff format --check . && uv run mypy src
 ```
 
-Unit tests cover every module in `src/newschat` individually — cleaner rules
-against real corpus fragments, dedupe's longest-body rule on the real
-divergent groups, `infer_period()` asserted against the real file (not only
-synthetic fixtures — a synthetic-only test is exactly what would let the May
-2014 / January 2026 boilerplate bug ship), the refusal gate against
-plausible out-of-corpus finance questions. API tests exercise the FastAPI
-routes with `TestClient`, including a two-request follow-up that resolves an
-inherited ticker across a session.
+Unit tests cover every module in `src/newschat` — cleaner rules against real
+corpus fragments, dedupe's longest-body rule on the real divergent groups,
+`infer_period()` against the real file (a synthetic-only test is exactly what
+would let the May 2014 / January 2026 boilerplate bug ship), and the refusal
+gate against plausible out-of-corpus finance questions. API tests drive the
+routes with `TestClient`, including a two-request follow-up across a session.
 
 The golden set (`tests/eval/golden.yaml`) has three tiers, because a set
-written by the same person who tuned the retriever, from the articles it
-targets, can't disconfirm anything on its own: **seeded** (≈20 questions plus
-negatives, with `expected_articles`/`expected_tickers`/`expected_kinds`;
-thresholds asserted here), **paraphrase** (questions sharing no non-alias
-content word with the target headline, probing what BM25's title boost
-can't help with; reported at a lower bar, not asserted as strictly), and
-**thematic** (comparative/aggregate questions — one has 11 relevant articles
-across 6 tickers; reported **unasserted**, on purpose, rather than gamed
-into passing).
+written by whoever tuned the retriever can't disconfirm anything on its own:
+**seeded** (23 questions plus 6 negatives, with `expected_articles` /
+`expected_tickers` / `expected_kinds`; thresholds asserted), **paraphrase**
+(no non-alias content word shared with the target headline, probing what
+BM25's title boost can't help; reported at a lower bar), and **thematic**
+(comparative/aggregate — one has 11 relevant articles across 6 tickers;
+reported **unasserted**, on purpose, rather than gamed into passing).
 
 ```
 tier          n   recall@5     mrr  tickers   kinds  refused  false_ref  coverage
 ---------------------------------------------------------------------------------
-seeded       28       0.87    0.88     1.00    0.80     1.00       0.00         -
+seeded       29       0.88    0.88     1.00    0.80     1.00       0.00         -
 paraphrase    8       0.56    0.43     1.00       -        -       0.25         -
 thematic      5          -       -        -       -        -       0.40      0.60
 threshold             0.80    0.70     0.90    0.80     1.00          -         -   (asserted on seeded)
 passed: True
 ```
 
-`refused` is the share of *negatives* the gate refused; `false_ref` is the
-share of *positives* it refused, reported and deliberately not asserted.
-Together they are the two halves of the same trade, and the second half is
-where the last two tiers' numbers actually come from.
+`refused` is the share of *negatives* the gate refused; `false_ref` the share
+of *positives* it refused (reported, not asserted) — two halves of one trade,
+and the second half is where the last two tiers' numbers come from.
 
-The thematic tier's 0.60 is not a `k=5` ceiling: measured per case,
-`theme-intel-vs-nvidia`, `theme-most-profitable` and `theme-ai-race` each
-score 1.00 ticker coverage, while `theme-deepseek` and `theme-market-mood`
-return **zero hits** — the absolute gate refuses them outright. Likewise
-`para-streaming-sports` and `para-wall-street-mood` are refusals, not
-ranking misses. So the absolute gate refuses 2 of 8 paraphrases and 2 of 5
-thematic questions: that is the measured price of refusing Boeing and
-Bitcoin 100 % of the time, on the same corpus, with the same constants. A
-gate loose enough to answer "What's the overall market mood?" is a gate
-loose enough to answer "What is the price of Bitcoin today?", and this
-project chose the other side of that line — visibly, with the cost printed
-in its own report rather than left out of it.
+The thematic tier's 0.60 is not a `k=5` ceiling: `theme-intel-vs-nvidia`,
+`theme-most-profitable` and `theme-ai-race` each score 1.00 ticker coverage,
+while `theme-deepseek` and `theme-market-mood` return **zero hits** — the
+absolute gate refuses them, as it does `para-streaming-sports` and
+`para-wall-street-mood`. Refusing 2 of 8 paraphrases and 2 of 5 thematic
+questions is the measured price of refusing Boeing and Bitcoin 100 % of the
+time with the same constants: a gate loose enough to answer "What's the
+overall market mood?" is loose enough to answer "What is the price of Bitcoin
+today?", and this project chose the other side of that line, with the cost
+printed in its own report.
 
-Full output, including the per-question misses behind those numbers, is
-committed at [`examples/eval-report.txt`](examples/eval-report.txt). Two
-more misses worth calling out rather than hiding: `intel-price-targets`
-scores 0.00 recall because its three target articles are MT Newswires
-paywall stubs (~100 characters), which the retriever's truncation penalty
-deliberately down-ranks — the gate is trading recall on stub articles for
-not citing near-empty text as a source. The paraphrase tier's MRR of 0.43
-against seeded's 0.88 is the measured cost of having no embeddings — see
-[Design decisions](#design-decisions).
+Per-question misses are in
+[`examples/eval-report.txt`](examples/eval-report.txt). One worth calling out:
+`intel-price-targets` scores 0.00 recall because its three targets are MT
+Newswires paywall stubs (~100 characters), which the truncation penalty
+deliberately down-ranks rather than cite near-empty text. The paraphrase
+tier's MRR of 0.43 against seeded's 0.88 is the measured cost of having no
+embeddings (see [Design decisions](#design-decisions)).
 
-Coverage (`examples/coverage.txt`, regenerated with
+Coverage ([`examples/coverage.txt`](examples/coverage.txt), regenerated with
 `pytest --cov=newschat --cov-report=term-missing`):
 
 ```
-TOTAL                                   1016      7    99%
+TOTAL                                   1143      8    99%
 ```
 
-Tests that exercise the live Claude CLI are marked `@pytest.mark.llm` and are
-skipped unless `claude` is on `PATH` **and** `NEWSCHAT_RUN_LLM_TESTS=1` is
-set — so CI, and a reviewer's default `pytest` run, never depend on network
-access or a subscription. CI (`.github/workflows/ci.yml`) runs `uv sync`,
-`ruff check`, `ruff format --check`, `mypy src`, and
-`pytest --cov --cov-fail-under=90` on Python 3.12 for every push and pull
+The live Claude CLI test (`@pytest.mark.llm`) is skipped unless `claude` is
+on `PATH` **and** `NEWSCHAT_RUN_LLM_TESTS=1`, so CI and a default run never need
+network or a subscription. CI (`.github/workflows/ci.yml`) runs `uv sync`,
+`ruff check`, `ruff format --check`, `mypy src`, and `pytest
+--cov=newschat --cov-fail-under=90` on Python 3.12 for every push and pull
 request.
 
 ## Design decisions
@@ -363,45 +427,36 @@ request.
 
 ## Limitations and next steps
 
-- **Citations are provenance, not entailment.** The guarantee is that every
-  cited sentence is reproduced verbatim from the article it cites, not that
-  two cited sentences agree with each other — nothing currently detects a
-  cross-citation contradiction. `check_faithfulness()` is a cheap
-  lexical-overlap stand-in that catches an unsupported or fabricated claim,
-  not a subtly distorted one; a full entailment judge and cross-bullet
-  contradiction detection are future work.
-- **The claim-type classifier is coarse** — a small ordered list of regex
-  rules, not a learned model — and its measured accuracy sits exactly at its
-  0.80 assertion floor, a real ceiling on this approach, not a margin.
-- **No article carries a date**, so there is no true time filtering, only a
-  single inferred corpus period (`as_of`) applied uniformly to every answer.
-  Publication dates via article metadata, and true filtering by them, remain
-  future work.
-- **Retrieval is purely lexical** (no embeddings), so paraphrased questions
-  that share no vocabulary with a headline score meaningfully worse than
-  questions that do — the paraphrase tier's MRR of 0.43 against seeded's
-  0.88 quantifies that gap directly. A fused BM25 + embeddings retriever
-  (reciprocal rank fusion) is the natural next `Retriever` implementation.
-- **Extractive selection has no per-article cap** — MMR de-duplicates
-  near-identical sentences but doesn't limit how many bullets one article
-  can supply, so on a thin retrieval set a single article can dominate.
-- **The tokenizer splits hyphenated tokens** ("e-commerce" becomes "e" and
-  "commerce"), weakening matches on hyphenated terms; not currently fixed.
-- **The LLM path is unverified in CI** — Claude CLI tests are marked `llm`
-  and skipped by default (see [Testing](#testing)), so its correctness rests
-  on manual runs like `examples/transcripts.md`, not on the CI gate the rest
-  of the project relies on.
-- Also documented but not built: persistent (rather than in-memory) sessions,
-  and a streaming response instead of one-shot JSON.
+- **Citations are provenance, not entailment.** Every cited sentence is
+  verbatim from its article, but nothing checks that two cited sentences agree.
+  `check_faithfulness()` is a lexical-overlap stand-in that catches a fabricated
+  claim, not a subtly distorted one; an entailment judge is future work.
+- **The claim-type classifier is coarse** — ordered regex rules — and its
+  accuracy sits exactly at its 0.80 assertion floor: a ceiling, not a margin.
+- **No article carries a date**, so there is no time filtering, only one
+  inferred corpus period (`as_of`) applied to every answer.
+- **Retrieval is purely lexical.** Paraphrases that share no vocabulary with a
+  headline score worse (paraphrase MRR 0.43 vs seeded 0.88); a fused BM25 +
+  embeddings retriever (reciprocal rank fusion) is the natural next step.
+- **No typo tolerance.** "What's going on with intell?" is refused: "intell"
+  is neither an alias nor a corpus word, and there is no fuzzy matching.
+- **The gate measures evidence, not relevance.** Any question whose words
+  genuinely occur in the corpus gets answered: "Best restaurants in Chicago"
+  cites a Zacks preview datelined Chicago and a McDonald's article.
+- **Comparisons are not balanced per ticker.** "Compare Apple and Netflix"
+  ranks both together, so the higher-scoring side can take every bullet.
+- **No per-article cap in extractive selection** — MMR removes near-duplicate
+  sentences, but one article can still supply most bullets on a thin result.
+- **The tokenizer splits hyphenated tokens** ("e-commerce" → "e", "commerce").
+- **The LLM path is not exercised in CI**; its evidence is manual runs such as
+  [`examples/transcripts.md`](examples/transcripts.md).
+- Not built: persistent sessions, streaming responses.
 
 ## Repository notes
 
-`scripts/measure_gate.py` is the script that measured the frozen refusal-gate
-constants (`min_strength = 1.0`, `min_coverage = 0.45`) against the
-real corpus and its negative questions — it's how those numbers were chosen,
-not guessed. The measurement that fixed them: every negative's best row
-peaked at strength 0.77, every positive's worst at 1.20, and the bare-topic
-queries sit at 2.17. `examples/` holds evidence regenerated from the working tree
-(the eval table, the full `pytest --cov` output, and CLI/extractive sample
-transcripts) so a reviewer can read the project's own claims about itself
-without having to run anything.
+`scripts/measure_gate.py` (`uv run python scripts/measure_gate.py`) measured
+the gate constants (`min_strength = 1.0`, `min_coverage = 0.45`) on the real
+corpus: every negative's best row peaked at strength 0.77, every positive's
+worst at 1.20, and bare-topic queries sit at 2.17. `examples/` holds evidence
+regenerated from the working tree (eval report, full `pytest --cov` output,
+sample transcripts), so the project's claims can be checked without running it.
