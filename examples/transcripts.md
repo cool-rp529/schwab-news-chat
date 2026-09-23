@@ -71,10 +71,10 @@ backend: claude-cli
 ## What is the price of Bitcoin today?
 
 This one demonstrates the refusal path: retrieval finds nothing that clears
-the absolute gate, so the request never reaches the Claude CLI at all (no
-`backend:` line is printed because no summarizer needed to run) — the refusal
-is a retrieval-layer decision, not something either backend has to remember
-to say.
+the absolute gate, so the refusal is produced before any prompt is built and
+the Claude CLI is never invoked (no network call). The `backend:` line still
+names the configured backend. The refusal is a retrieval-layer decision, not
+something either backend has to remember to say.
 
 ```
 Based on news from ≈ February 2025:
@@ -82,6 +82,8 @@ Based on news from ≈ February 2025:
 The news set doesn't cover that. It holds coverage of AAPL, AMZN, IBM, INTC, MSFT, NFLX, NVDA from around February 2025 — try a question about one of those companies.
 
 Informational summary of news coverage — not investment advice.
+
+backend: claude-cli
 ```
 
 ## Side by side: the default extractive backend
